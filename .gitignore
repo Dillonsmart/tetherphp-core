@@ -1,0 +1,7 @@
+.idea
+.DS_Store
+.env
+storage/private/*
+storage/logs/*
+TODO.md
+vendor
