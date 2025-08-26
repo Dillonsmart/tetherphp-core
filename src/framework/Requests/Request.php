@@ -1,8 +1,8 @@
 <?php
 
-namespace TetherPHP\Core\Requests;
+namespace TetherPHP\framework\Requests;
 
-use TetherPHP\Core\Interfaces\RequestInterface;
+use TetherPHP\framework\Interfaces\RequestInterface;
 
 class Request implements RequestInterface
 {

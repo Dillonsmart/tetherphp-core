@@ -1,6 +1,6 @@
 <?php
 
-namespace TetherPHP\Core\Commands;
+namespace TetherPHP\framework\Commands;
 
 class Command
 { // TODO when the command is executed we need to get the arguments and options from the command line input

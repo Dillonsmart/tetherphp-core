@@ -1,8 +1,8 @@
 <?php
 
-namespace TetherPHP\Core\Modules;
+namespace TetherPHP\framework\Modules;
 
-use TetherPHP\Core\Commands\Command;
+use TetherPHP\framework\Commands\Command;
 
 class Console
 {
@@ -52,7 +52,7 @@ class Console
         }
 
         // TODO - If command methods are going to be called directly, maybe consider a shared trait.
-        (new \TetherPHP\Core\Commands\Command)->error("Command {$this->command} not found.");
+        (new \TetherPHP\framework\Commands\Command)->error("Command {$this->command} not found.");
         return Command::COMMAND_ERROR;
     }
 }

@@ -2,8 +2,8 @@
 
 namespace TetherPHP;
 
-use TetherPHP\Core\DTOs\RouteDTO;
-use TetherPHP\Core\Requests\Request;
+use TetherPHP\framework\DTOs\RouteDTO;
+use TetherPHP\framework\Requests\Request;
 
 class Router {
     public array $routes = [

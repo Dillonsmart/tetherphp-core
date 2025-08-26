@@ -1,8 +1,8 @@
 <?php
 
-namespace TetherPHP\Core\Commands;
+namespace TetherPHP\framework\Commands;
 
-use TetherPHP\Core\Traits\Strings;
+use TetherPHP\framework\Traits\Strings;
 
 class MakeFeatureCommand extends Command
 {

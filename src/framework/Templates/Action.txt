@@ -3,8 +3,8 @@
 namespace Actions;
 
 use Responders\{{className}} as Responder;
-use TetherPHP\Core\Requests\Request;
-use TetherPHP\Core\Interfaces\ActionInterface;
+use TetherPHP\framework\Requests\Request;
+use TetherPHP\framework\Interfaces\ActionInterface;
 
 class {{className}} extends Action implements ActionInterface
 {

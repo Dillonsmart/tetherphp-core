@@ -2,7 +2,7 @@
 
 namespace Commands;
 
-use TetherPHP\Core\Commands\Command;
+use TetherPHP\framework\Commands\Command;
 
 class {{className}} extends Command
 {

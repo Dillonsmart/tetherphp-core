@@ -1,8 +1,8 @@
 <?php
 
-namespace TetherPHP\Core\DTOs;
+namespace TetherPHP\framework\DTOs;
 
-use TetherPHP\Core\Interfaces\ActionInterface;
+use TetherPHP\framework\Interfaces\ActionInterface;
 
 class RouteDTO
 {

@@ -6,7 +6,10 @@
   "autoload": {
     "psr-4": {
       "TetherPHP\\": "src/"
-    }
+    },
+    "files": [
+      "src/framework/Helpers/GlobalFunctions.php"
+    ]
   },
   "require": {
     "php": ">=8.1"

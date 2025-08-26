@@ -1,6 +1,6 @@
 <?php
 
-namespace TetherPHP\Core\Traits;
+namespace TetherPHP\framework\Traits;
 
 trait Strings
 {

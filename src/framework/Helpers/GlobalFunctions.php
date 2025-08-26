@@ -1,10 +1,14 @@
 <?php
 
 use JetBrains\PhpStorm\NoReturn;
+use Composer\InstalledVersions;
 
 function project_root(): string
 {
-    return dirname(__DIR__, 3);
+    $rootPackage = InstalledVersions::getRootPackage();
+    // path to the root project
+
+    return $rootPackage['install_path'];
 }
 
 function app_dir(): string
@@ -44,7 +48,7 @@ function view(string $view)
 
 function env(string $key): ?string
 {
-    $env = \TetherPHP\Core\Modules\Env::getInstance();
+    $env = \TetherPHP\framework\Modules\Env::getInstance();
     try {
         return $env->getEnv($key);
     } catch (\Exception $e) {
@@ -55,8 +59,8 @@ function env(string $key): ?string
 function logger(string $message, string $level = 'info'): void
 {
     if ($level === 'error') {
-        \TetherPHP\Core\Modules\Log::error($message);
+        \TetherPHP\framework\Modules\Log::error($message);
     } else {
-        \TetherPHP\Core\Modules\Log::info($message);
+        \TetherPHP\framework\Modules\Log::info($message);
     }
 }

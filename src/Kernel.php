@@ -3,8 +3,8 @@
 namespace TetherPHP;
 
 use Responders\Responder;
-use TetherPHP\Core\Modules\Env;
-use TetherPHP\Core\Requests\Request;
+use TetherPHP\framework\Modules\Env;
+use TetherPHP\framework\Requests\Request;
 
 class Kernel {
 
@@ -71,14 +71,14 @@ class Kernel {
         }
 
         set_error_handler(function($errno, $errstr, $errfile, $errline) {
-            \TetherPHP\Core\Modules\Log::error("Error [$errno]: $errstr in $errfile on line $errline");
+            \TetherPHP\framework\Modules\Log::error("Error [$errno]: $errstr in $errfile on line $errline");
             include(core_views() . 'errors/500.php');
             exit(500);
         });
 
         set_exception_handler(function($exception) {
-            \TetherPHP\Core\Modules\Log::error("Uncaught Exception: " . $exception->getMessage());
-            \TetherPHP\Core\Modules\Log::error("Uncaught Exception: " . $exception->getTraceAsString());
+            \TetherPHP\framework\Modules\Log::error("Uncaught Exception: " . $exception->getMessage());
+            \TetherPHP\framework\Modules\Log::error("Uncaught Exception: " . $exception->getTraceAsString());
             include(core_views() . 'errors/500.php');
             exit(500);
         });

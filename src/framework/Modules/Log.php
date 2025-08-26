@@ -1,6 +1,6 @@
 <?php
 
-namespace TetherPHP\Core\Modules;
+namespace TetherPHP\framework\Modules;
 
 class Log
 {

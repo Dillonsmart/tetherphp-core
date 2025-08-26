@@ -1,8 +1,8 @@
 <?php
 
-namespace TetherPHP\Core\Commands;
+namespace TetherPHP\framework\Commands;
 
-use TetherPHP\Core\Modules\Console;
+use TetherPHP\framework\Modules\Console;
 
 class HelpCommand extends Command
 {

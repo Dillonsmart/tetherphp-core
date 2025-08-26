@@ -1,6 +1,6 @@
 <?php
 
-namespace TetherPHP\Core\Commands;
+namespace TetherPHP\framework\Commands;
 
 class ClearBoilerPlateCommand extends Command
 {

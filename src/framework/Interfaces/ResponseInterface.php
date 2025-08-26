@@ -1,6 +1,6 @@
 <?php
 
-namespace TetherPHP\Core\Interfaces;
+namespace TetherPHP\framework\Interfaces;
 
 interface ResponseInterface
 {
