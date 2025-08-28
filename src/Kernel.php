@@ -4,6 +4,7 @@ namespace TetherPHP;
 
 use Responders\Responder;
 use TetherPHP\framework\Modules\Env;
+use TetherPHP\framework\Modules\Log;
 use TetherPHP\framework\Requests\Request;
 
 class Kernel {
@@ -37,7 +38,7 @@ class Kernel {
 
         // the lack of action indicates the route was not found
         if(!isset($route->action)) {
-            include(core_views() . 'errors/404.php');
+            include(views_dir() . 'errors/404.php');
             exit(404);
         }
 
@@ -45,7 +46,7 @@ class Kernel {
             return new Responder($this->request)->view($route->action, []);
         } else {
             if(!class_exists($route->action)) {
-                include(core_views() . 'errors/500.php');
+                include(views_dir() . 'errors/500.php');
                 exit(500);
             }
         }
@@ -71,15 +72,15 @@ class Kernel {
         }
 
         set_error_handler(function($errno, $errstr, $errfile, $errline) {
-            \TetherPHP\framework\Modules\Log::error("Error [$errno]: $errstr in $errfile on line $errline");
-            include(core_views() . 'errors/500.php');
+            Log::error("Error [$errno]: $errstr in $errfile on line $errline");
+            include(views_dir() . 'errors/500.php');
             exit(500);
         });
 
         set_exception_handler(function($exception) {
-            \TetherPHP\framework\Modules\Log::error("Uncaught Exception: " . $exception->getMessage());
-            \TetherPHP\framework\Modules\Log::error("Uncaught Exception: " . $exception->getTraceAsString());
-            include(core_views() . 'errors/500.php');
+            Log::error("Uncaught Exception: " . $exception->getMessage());
+            Log::error("Uncaught Exception: " . $exception->getTraceAsString());
+            include(views_dir() . 'errors/500.php');
             exit(500);
         });
     }

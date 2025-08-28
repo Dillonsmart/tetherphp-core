@@ -1,6 +1,5 @@
 <?php
 
-use JetBrains\PhpStorm\NoReturn;
 use Composer\InstalledVersions;
 
 function project_root(): string
@@ -9,6 +8,11 @@ function project_root(): string
     // path to the root project
 
     return $rootPackage['install_path'];
+}
+
+function package_root(): string
+{
+    return dirname(__DIR__, 3);
 }
 
 function app_dir(): string
@@ -33,7 +37,7 @@ function public_dir(): string
 
 function core_dir(): string
 {
-    return project_root() . '/tetherphp/framework';
+    return package_root() . '/src/framework';
 }
 
 function core_views(): string
