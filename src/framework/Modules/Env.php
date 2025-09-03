@@ -59,6 +59,7 @@ class Env
             return $this->envVars[$key];
         }
 
+        Log::error("Environment variable '{$key}' not found.");
         throw new \Exception("Environment variable '{$key}' not found.");
     }
 }

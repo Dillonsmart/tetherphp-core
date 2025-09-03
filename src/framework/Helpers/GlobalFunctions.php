@@ -56,6 +56,7 @@ function env(string $key): ?string
     try {
         return $env->getEnv($key);
     } catch (\Exception $e) {
+        logger($e, 'error');;
         return null;
     }
 }

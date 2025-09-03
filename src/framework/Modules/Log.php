@@ -4,7 +4,7 @@ namespace TetherPHP\framework\Modules;
 
 class Log
 {
-    private const string LOG_DIR = 'logs/';
+    private const  LOG_DIR = 'logs/';
 
     public static function error(string $message): void
     {
