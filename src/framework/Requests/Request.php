@@ -3,6 +3,7 @@
 namespace TetherPHP\framework\Requests;
 
 use TetherPHP\framework\Interfaces\RequestInterface;
+use TetherPHP\framework\Sessions\Session;
 
 class Request implements RequestInterface
 {
@@ -34,10 +35,30 @@ class Request implements RequestInterface
 
     public float|string $startTime;
 
-    public function __construct(string $method = '', string $uri = '', float|string $startTime = '')
+    protected string $csrfToken;
+
+    /**
+     * @throws \Exception
+     */
+    public function __construct(Session $session, string $method = '', string $uri = '', float|string $startTime = '')
     {
         $this->method = $method;
         $this->uri = $uri;
         $this->startTime = $startTime ?: microtime(true);
+        $this->csrfToken = $session->get('csrf_token');
+
+        if(in_array(strtoupper($method), ['POST', 'PUT', 'PATCH', 'DELETE'])) {
+            $this->validateCsrfToken($_POST['csrf_token']);
+        }
+    }
+
+    /**
+     * @throws \Exception
+     */
+    public function validateCsrfToken(string $token): void
+    {
+        if(!hash_equals($this->csrfToken, $token)) {
+            throw new \Exception('Invalid CSRF token');
+        }
     }
 }
