@@ -29,7 +29,7 @@ class MakeCommand extends Command
             return self::COMMAND_ERROR;
         }
 
-        $template = file_get_contents(core_dir() . '/Templates/Command.txt');
+        $template = file_get_contents(core_dir() . '/Stubs/Command.txt');
         $template = str_replace('{{className}}', $className, $template);
 
         if (file_put_contents($commandFilePath, $template) === false) {

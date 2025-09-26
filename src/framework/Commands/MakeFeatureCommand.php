@@ -58,7 +58,7 @@ class MakeFeatureCommand extends Command
             return self::COMMAND_ERROR;
         }
 
-        if (file_put_contents($actionFilePath, $this->generateTemplate('/Templates/Action.txt')) === false) {
+        if (file_put_contents($actionFilePath, $this->generateTemplate('/Stubs/Action.txt')) === false) {
             $this->error("Failed to create class: {$actionFilePath}\n");
             return self::COMMAND_ERROR;
         }
@@ -76,7 +76,7 @@ class MakeFeatureCommand extends Command
             return self::COMMAND_ERROR;
         }
 
-        if (file_put_contents($domainFilePath, $this->generateTemplate('/Templates/Domain.txt')) === false) {
+        if (file_put_contents($domainFilePath, $this->generateTemplate('/Stubs/Domain.txt')) === false) {
             $this->error("Failed to create class: {$domainFilePath}\n");
             return self::COMMAND_ERROR;
         }
@@ -94,7 +94,7 @@ class MakeFeatureCommand extends Command
             return self::COMMAND_ERROR;
         }
 
-        if (file_put_contents($domainFilePath, $this->generateTemplate('/Templates/Responder.txt')) === false) {
+        if (file_put_contents($domainFilePath, $this->generateTemplate('/Stubs/Responder.txt')) === false) {
             $this->error("Failed to create class: {$domainFilePath}\n");
             return self::COMMAND_ERROR;
         }
