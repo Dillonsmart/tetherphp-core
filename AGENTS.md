@@ -22,6 +22,9 @@ checklist; the short form:
 6. **Tools Are Part of the Framework** — the CLI is first-class. A runtime feature is not finished until the tooling
    can show it.
 
+The refactor sequence that brings the code into line with them is in [docs/ROADMAP.md](docs/ROADMAP.md). Check it
+before starting framework work — a change that belongs to a later phase may be waiting on an earlier one.
+
 ## Setup
 
 ```bash
