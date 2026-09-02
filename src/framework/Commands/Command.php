@@ -14,10 +14,29 @@ class Command
 
     public string $description = '';
 
+    /** @var array<string, string> */
     protected array $arguments = [];
 
+    /**
+     * @param list<string> $args
+     * @param array<string, string> $opts
+     */
     public function __construct(public array $args = [], public array $opts = [])
     {}
+
+    /**
+     * Overridden by every real command. Declared here because Console calls it,
+     * and a base class that does not declare what it calls is a lie.
+     *
+     * A native `int` return type would break any subclass that overrides this
+     * without one, so it stays a docblock until the next breaking release.
+     *
+     * @return int one of the COMMAND_* constants
+     */
+    public function execute()
+    {
+        return self::COMMAND_ERROR;
+    }
 
     public function info(string $message): void
     {
@@ -34,7 +53,10 @@ class Command
         echo "\033[31m{$message}\033[0m \n";
     }
 
-    public function argument(string $name): string|\Exception
+    /**
+     * @throws \InvalidArgumentException when the command does not declare $name
+     */
+    public function argument(string $name): string
     {
         if (array_key_exists($name, $this->arguments)) {
             $index = array_search($name, array_keys($this->arguments));

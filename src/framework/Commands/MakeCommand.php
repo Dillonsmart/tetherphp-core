@@ -18,7 +18,7 @@ class MakeCommand extends Command
         'name' => 'The name of the command',
     ];
 
-    public function execute()
+    public function execute(): int
     {
         $name = $this->argument('name');
 
@@ -47,7 +47,7 @@ class MakeCommand extends Command
             return self::COMMAND_ERROR;
         }
 
-        $template = file_get_contents(core_dir() . '/Stubs/Command.txt');
+        $template = file_get_contents(core_dir() . '/Stubs/Command.txt') ?: '';
         $template = str_replace(
             ['{{className}}', '{{commandName}}'],
             [$className, $commandName],

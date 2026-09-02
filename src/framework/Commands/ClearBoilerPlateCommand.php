@@ -11,8 +11,10 @@ class ClearBoilerPlateCommand extends Command
 
     public string $description = 'Clears all the boilerplate files from the project';
 
-    protected array $arguments = []; // listed in the order they are defined
+    /** @var array<string, string> listed in the order they are defined */
+    protected array $arguments = [];
 
+    /** @var list<string> */
     protected array $protectedFiles = [
         'Action.txt',
         'Responder.php',
@@ -22,7 +24,7 @@ class ClearBoilerPlateCommand extends Command
     public function execute(): int
     {
         try {
-            $filesToDelete = glob(app_dir() . '/**/*.php', GLOB_BRACE);
+            $filesToDelete = glob(app_dir() . '/**/*.php', GLOB_BRACE) ?: [];
 
             foreach ($filesToDelete as $file) {
                 if (is_file($file)) {

@@ -8,6 +8,7 @@ class Env
 {
     protected static ?Env $instance = null;
     protected string $basePath = '';
+    /** @var array<string, string> */
     protected array $envVars = [];
 
     /**
@@ -38,7 +39,7 @@ class Env
             throw new \Exception('Env file not found');
         }
 
-        $envContent = file_get_contents($envFile);
+        $envContent = file_get_contents($envFile) ?: '';
         $lines = explode("\n", $envContent);
         foreach ($lines as $line) {
             $line = trim($line);
@@ -55,7 +56,7 @@ class Env
     /**
      * @throws \Exception
      */
-    public function getEnv(string $key)
+    public function getEnv(string $key): string
     {
         if (array_key_exists($key, $this->envVars)) {
             return $this->envVars[$key];

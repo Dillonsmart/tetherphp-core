@@ -51,6 +51,9 @@ function core_views(): string
     return core_dir() . '/Views/';
 }
 
+/**
+ * @return mixed whatever the included view returns
+ */
 function view(string $view)
 {
     return include views_dir() . '/' . $view . '.php';

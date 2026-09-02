@@ -26,7 +26,7 @@ class GlobalFunctionsTest extends TestCase
     {
         $this->assertFileExists(package_root() . '/composer.json');
 
-        $manifest = json_decode(file_get_contents(package_root() . '/composer.json'), true);
+        $manifest = json_decode(file_get_contents(package_root() . '/composer.json') ?: '', true);
 
         $this->assertSame('dillonsmart/tetherphp-core', $manifest['name']);
     }

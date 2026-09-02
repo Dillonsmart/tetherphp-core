@@ -40,7 +40,9 @@ class Session
 
     public function getSessionId(): string
     {
-        return $_SESSION['SESSION_ID'] ?? session_id();
+        $id = $_SESSION['SESSION_ID'] ?? session_id();
+
+        return is_string($id) ? $id : '';
     }
 
     public function startTime(): void
@@ -74,8 +76,11 @@ class Session
     public function isExpired(): bool
     {
         $now = time();
-        $startTime = $_SESSION['start_time'] ?? $now;
-        $lastActivity = $_SESSION['last_activity'] ?? $now;
+
+        // session contents are whatever was last written there; a corrupted or
+        // tampered value must not reach arithmetic
+        $startTime = is_int($_SESSION['start_time'] ?? null) ? $_SESSION['start_time'] : $now;
+        $lastActivity = is_int($_SESSION['last_activity'] ?? null) ? $_SESSION['last_activity'] : $now;
         $timeout = self::TIMEOUT;
 
         if (($now - $startTime > $timeout) || ($now - $lastActivity > $timeout)) {

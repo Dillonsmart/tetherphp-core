@@ -8,6 +8,7 @@ use TetherPHP\framework\DTOs\RouteDTO;
 use TetherPHP\framework\Requests\Request;
 
 class Router {
+    /** @var array{GET: array<string, array<string, mixed>>, POST: array<string, array<string, mixed>>} */
     public array $routes = [
         'GET' => [],
         'POST' => []
@@ -44,6 +45,7 @@ class Router {
         return $this->prefix . $uri;
     }
 
+    /** @return array{action: string, type: string, parts: list<string>} */
     public function buildRoute(): array
     {
         return [
@@ -57,6 +59,7 @@ class Router {
         return str_contains($uri, '{') && str_contains($uri, '}');
     }
 
+    /** @return list<string> */
     public function handleDynamicParts(string $uri): array
     {
         $dynamicParts = explode('{', $uri);

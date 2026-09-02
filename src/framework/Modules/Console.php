@@ -8,6 +8,7 @@ use TetherPHP\framework\Commands\Command;
 
 class Console
 {
+    /** @var array<string, class-string<Command>> */
     public array $commands = [];
 
     /** @var string[] reasons commands were not registered */
@@ -45,11 +46,11 @@ class Console
     public function registerCommands(): void
     {
         $tetherCommands =  [
-            ...glob(__DIR__ . "/../Commands/*.php"),
+            ...(glob(__DIR__ . "/../Commands/*.php") ?: []),
         ];
 
         $customCommands = [
-            ...glob(app_dir() . "/Commands/*.php"),
+            ...(glob(app_dir() . "/Commands/*.php") ?: []),
         ];
 
         foreach ($tetherCommands as $commandClass) {
@@ -105,11 +106,16 @@ class Console
     /**
      * Reasons commands were not registered, for `help` to report.
      */
+    /** @return string[] */
     public function skipped(): array
     {
         return $this->skipped;
     }
 
+    /**
+     * @param list<string> $args
+     * @param array<string, string> $options
+     */
     public function executeCommand(array $args = [], array $options = []): int
     {
         if (isset($this->commands[$this->command])) {

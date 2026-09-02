@@ -26,6 +26,7 @@ class Request implements RequestInterface
         }
     }
 
+    /** @var array<string, mixed> */
     public array $payload {
         get {
             return $this->payload;

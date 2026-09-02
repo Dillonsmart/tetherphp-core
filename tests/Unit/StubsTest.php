@@ -8,7 +8,7 @@ class StubsTest extends TestCase
 {
     private function stub(string $name): string
     {
-        return file_get_contents(core_dir() . "/Stubs/{$name}.txt");
+        return file_get_contents(core_dir() . "/Stubs/{$name}.txt") ?: '';
     }
 
     public function testEveryStubIsReachableThroughCoreDir(): void

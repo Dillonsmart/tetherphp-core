@@ -44,6 +44,8 @@ class Kernel
     }
 
     /**
+     * @return string the response body
+     *
      * @throws \Exception
      */
     public function run()
@@ -61,7 +63,7 @@ class Kernel
         if ($route->type === 'view') {
             ob_start();
             include(views_dir() . str_replace('.', '/', $route->action) . '.php');
-            return ob_get_clean();
+            return ob_get_clean() ?: '';
         }
 
         if (!class_exists($route->action)) {
@@ -72,12 +74,22 @@ class Kernel
 
         // CONTENT_TYPE is absent on any request without a body, which is most of them
         if (($_SERVER['CONTENT_TYPE'] ?? '') === 'application/json') {
-            $this->request->payload = json_decode(file_get_contents('php://input'), true) ?? [];
+            $this->request->payload = json_decode(file_get_contents('php://input') ?: '', true) ?? [];
         } else {
             $this->request->payload = $_POST;
         }
 
         $invokeAction = new $route->action($this->request);
+
+        if (!is_callable($invokeAction)) {
+            Log::error("Action {$route->action} is not invokable — it needs an __invoke() method.");
+
+            http_response_code(500);
+            include(views_dir() . 'errors/500.php');
+
+            return '';
+        }
+
         return $invokeAction();
     }
 

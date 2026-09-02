@@ -125,8 +125,13 @@ PHPUnit 11, bootstrapped from `tests/bootstrap.php`. Two suites:
 that root. `tests/bootstrap.php` symlinks `tests/Fixtures/app` to `./app` and writes a `.env` if absent; both are
 gitignored. Add fixtures there rather than mocking the path helpers.
 
-PHPStan runs at level 5 over `src` and `tests` (`composer analyse`). Fixtures are excluded deliberately — they
+PHPStan runs at **level 8** over `src` and `tests` (`composer analyse`). Fixtures are excluded deliberately — they
 contain classes that are wrong on purpose.
+
+Level 9 is not yet reachable, and the reason is structural rather than cosmetic: `Session::get()` returns `mixed`,
+and `$_SERVER` and `$_POST` enter the framework untyped, so every value derived from them is `mixed` too. Fixing
+that means typing the request/session boundary, which is Phase 2/3 work — do not close the gap with casts or
+`@phpstan-ignore`.
 
 Cover behaviour that consumers depend on: route resolution order (static wins over dynamic), group prefixing, the
 path helpers, CSRF acceptance and rejection, and the stub placeholder contract.

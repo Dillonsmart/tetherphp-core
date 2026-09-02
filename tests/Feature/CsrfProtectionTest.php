@@ -25,7 +25,10 @@ class CsrfProtectionTest extends TestCase
     {
         new CsrfToken($this->session);
 
-        return $this->session->get('csrf_token');
+        $token = $this->session->get('csrf_token');
+        $this->assertIsString($token);
+
+        return $token;
     }
 
     public function testAcceptsAWriteCarryingTheSessionToken(): void
@@ -88,6 +91,7 @@ class CsrfProtectionTest extends TestCase
         $this->assertSame('/', $request->uri);
     }
 
+    /** @return list<list<string>> */
     public static function writeMethodProvider(): array
     {
         return [['POST'], ['PUT'], ['PATCH'], ['DELETE']];

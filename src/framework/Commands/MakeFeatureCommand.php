@@ -107,7 +107,7 @@ class MakeFeatureCommand extends Command
 
     private function generateTemplate(string $template): string
     {
-        $template = file_get_contents(core_dir() . $template);
+        $template = file_get_contents(core_dir() . $template) ?: '';
         return str_replace(
             ['{{className}}'],
             [$this->className],

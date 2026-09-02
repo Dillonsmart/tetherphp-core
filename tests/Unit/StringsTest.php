@@ -5,15 +5,22 @@ namespace TetherPHP\Tests\Unit;
 use PHPUnit\Framework\TestCase;
 use TetherPHP\framework\Traits\Strings;
 
+/**
+ * A trait needs a host class to be exercised. A named one keeps the methods
+ * visible to static analysis, which an anonymous class does not.
+ */
+final class StringsHost
+{
+    use Strings;
+}
+
 class StringsTest extends TestCase
 {
-    private object $subject;
+    private StringsHost $subject;
 
     protected function setUp(): void
     {
-        $this->subject = new class {
-            use Strings;
-        };
+        $this->subject = new StringsHost();
     }
 
     public function testConvertsHyphenatedNamesToPascalCase(): void

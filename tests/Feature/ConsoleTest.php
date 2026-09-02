@@ -15,7 +15,13 @@ class ConsoleTest extends TestCase
     protected function setUp(): void
     {
         // capture registration diagnostics instead of letting them hit stderr
-        $this->stream = fopen('php://memory', 'r+');
+        $stream = fopen('php://memory', 'r+');
+
+        if ($stream === false) {
+            $this->fail('could not open a memory stream');
+        }
+
+        $this->stream = $stream;
     }
 
     private function console(string $command = 'help'): Console

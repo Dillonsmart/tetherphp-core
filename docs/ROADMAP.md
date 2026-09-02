@@ -49,20 +49,29 @@ Read from the current source, not inferred. The principle named is the one the d
 
 Nothing new. Stop the framework lying about what it does.
 
-- ~~`declare(strict_types=1)` across `src/`~~ **done** (20 files). A return type on every method is still open, and
-  is partly blocked: adding one to a base-class method breaks subclasses that override without it, so
-  `Command::execute()` waits for `v0.4.0`.
+- ~~`declare(strict_types=1)` across `src/`~~ **done** (20 files), and ~~return/value types throughout~~ **done** —
+  every method and array property now carries one, natively or in a docblock. `Command::execute()` is declared on
+  the base class at last (Console had always called a method that was never declared) but deliberately without a
+  *native* return type, since adding one breaks subclasses that override without it. That is a `v0.4.0` change.
 - ~~Unguarded `CONTENT_TYPE`~~, ~~the error handler treating warnings as fatal~~, ~~the nullable CSRF token~~,
   ~~the missing `$_POST` key~~, ~~the no-op loop in `Router::group()`~~ — **all done**.
 - ~~Command registration fails **loudly**~~ **done** — unloadable classes, non-subclasses, missing `$command` and
   duplicate names each report a reason.
-- ~~PHPStan, plus GitHub Actions running tests and analysis on both repositories~~ **done** — level 5, clean; CI on
-  all three repos. Raising to max is still open.
+- ~~PHPStan, plus GitHub Actions running tests and analysis on both repositories~~ **done** — **level 8**, clean;
+  CI on all three repos. Getting there fixed thirteen unchecked failure paths: `glob()`, `file_get_contents()` and
+  `fopen()` returning `false`, `preg_replace()` returning `null`, a route class that might not be invokable, and
+  session values reaching arithmetic untyped.
 - ~~An integration harness (a fixture application inside `tests/`)~~ **done** — `tests/Fixtures/app`, linked into
   place by the bootstrap, with a `tests/Feature` suite.
 
-**Still open:** return types throughout, PHPStan above level 5, and Kernel coverage — the Kernel still `exit()`s,
-so it cannot be tested until Phase 2 gives it a single exit.
+**Phase 1 is complete.** What it could not reach, and why:
+
+- **PHPStan level 9** — blocked structurally. `Session::get()` returns `mixed` and `$_SERVER`/`$_POST` enter
+  untyped, so everything derived from them is `mixed`. Typing that boundary is Phase 2/3.
+- **Kernel test coverage** — the Kernel still `exit()`s, so it cannot be tested until Phase 2 gives it one exit.
+- **A native `int` return on `Command::execute()`** — breaking, so `v0.4.0`.
+
+These three are the argument for Phase 2, not leftovers from Phase 1.
 
 ## Phase 2 — One explicit pipeline · `v0.4.0`, breaking
 
