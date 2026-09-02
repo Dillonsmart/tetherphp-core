@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace TetherPHP\framework\Modules;
 
 class Env
@@ -59,7 +61,8 @@ class Env
             return $this->envVars[$key];
         }
 
-        Log::error("Environment variable '{$key}' not found.");
+        // not logged here — the caller decides whether a missing key is a problem,
+        // and env() already logs the ones it swallows
         throw new \Exception("Environment variable '{$key}' not found.");
     }
 }

@@ -49,16 +49,20 @@ Read from the current source, not inferred. The principle named is the one the d
 
 Nothing new. Stop the framework lying about what it does.
 
-- `declare(strict_types=1)` across `src/`, and a return type on every method.
-- ~~Unguarded `CONTENT_TYPE`~~ **done**, and ~~the error handler treating warnings as fatal~~ **done**. Still open:
-  the nullable CSRF token, the missing `$_POST` key, and the no-op loop in `Router::group()`.
-- Command registration fails **loudly** — a class that cannot be loaded or does not extend `Command` reports why.
-- PHPStan at max, plus GitHub Actions running tests and analysis on both repositories.
-- An integration harness (a fixture application inside `tests/`) so `app_dir()`-dependent behaviour is testable
-  without a linked skeleton.
+- ~~`declare(strict_types=1)` across `src/`~~ **done** (20 files). A return type on every method is still open, and
+  is partly blocked: adding one to a base-class method breaks subclasses that override without it, so
+  `Command::execute()` waits for `v0.4.0`.
+- ~~Unguarded `CONTENT_TYPE`~~, ~~the error handler treating warnings as fatal~~, ~~the nullable CSRF token~~,
+  ~~the missing `$_POST` key~~, ~~the no-op loop in `Router::group()`~~ — **all done**.
+- ~~Command registration fails **loudly**~~ **done** — unloadable classes, non-subclasses, missing `$command` and
+  duplicate names each report a reason.
+- ~~PHPStan, plus GitHub Actions running tests and analysis on both repositories~~ **done** — level 5, clean; CI on
+  all three repos. Raising to max is still open.
+- ~~An integration harness (a fixture application inside `tests/`)~~ **done** — `tests/Fixtures/app`, linked into
+  place by the bootstrap, with a `tests/Feature` suite.
 
-**Done when** CI is green on both repos, PHPStan reports zero at max, and a deliberately broken command produces a
-diagnostic rather than silence.
+**Still open:** return types throughout, PHPStan above level 5, and Kernel coverage — the Kernel still `exit()`s,
+so it cannot be tested until Phase 2 gives it a single exit.
 
 ## Phase 2 — One explicit pipeline · `v0.4.0`, breaking
 

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace TetherPHP;
 
 use TetherPHP\framework\Modules\Env;
@@ -72,7 +74,7 @@ class Kernel
         if (($_SERVER['CONTENT_TYPE'] ?? '') === 'application/json') {
             $this->request->payload = json_decode(file_get_contents('php://input'), true) ?? [];
         } else {
-            $this->request->payload = $_POST ?? [];
+            $this->request->payload = $_POST;
         }
 
         $invokeAction = new $route->action($this->request);

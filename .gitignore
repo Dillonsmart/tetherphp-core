@@ -4,3 +4,8 @@
 /.phpunit.cache
 /TODO.md
 /vendor
+
+# created by tests/bootstrap.php
+/app
+/.env
+/storage

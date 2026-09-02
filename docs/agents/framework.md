@@ -58,6 +58,11 @@ it cannot be called before `vendor/autoload.php`.
 
 ## PHP version
 
+Every file under `src/` declares `strict_types=1`. That is what turns a silently coerced argument into an error, so
+do not omit it from a new file — and be aware it is why `logger($e, 'error')` had to become
+`logger($e->getMessage(), 'error')`: an `Exception` was being coerced to a string via `__toString()`, dragging a
+stack trace into the log.
+
 `>=8.4`, and the code genuinely depends on it:
 
 - **Property hooks** — `Request::$method` and `$uri` normalise via `set` hooks (`$uri` is lowercased, so route
@@ -72,8 +77,12 @@ Do not "simplify" these into pre-8.4 forms.
 1. Add the class in `src/framework/Commands/`, extending `Command`, setting `$command` and `$description`.
 2. `Console::registerCommands()` globs `src/framework/Commands/*.php` and maps them to
    `TetherPHP\framework\Commands\<Basename>` — the class name must match the filename or it is silently skipped.
-3. Registration requires `class_exists()` **and** `is_subclass_of(..., Command::class)`. A command that fails either
-   check disappears from `tether help` with no error.
+3. Registration requires `class_exists()` **and** `is_subclass_of(..., Command::class)`. A command failing either
+   check is **skipped with a reason** written to stderr and recorded in `Console::skipped()` — it used to disappear
+   silently, which made a misnamed class, a missing psr-4 mapping and a file that was never written
+   indistinguishable. Duplicate command names and a missing `$command` are reported the same way.
+4. `Console` takes an optional error stream as its second argument, so tests can capture diagnostics instead of
+   letting them reach stderr.
 
 Applications get their own commands from `app/Commands/` under the `Commands\` namespace; that mapping lives in the
 skeleton's `composer.json`.
@@ -103,13 +112,24 @@ composer install
 composer test
 ```
 
-PHPUnit 11, bootstrapped from `tests/bootstrap.php`, suite in `tests/Unit`. The suite must stay runnable with no
-consuming application present — so do not write tests that depend on `app_dir()`, `views_dir()` or a `.env`, because
-in this repository `project_root()` is this repository. Anything needing an app belongs in an integration test against
-a linked skeleton checkout instead.
+```bash
+composer check          # tests + static analysis, what CI runs
+```
 
-Cover behaviour that consumers depend on: route resolution order (static wins over dynamic), group prefixing, and the
-path helpers.
+PHPUnit 11, bootstrapped from `tests/bootstrap.php`. Two suites:
+
+- `tests/Unit` — no application required.
+- `tests/Feature` — exercises code that reads `app_dir()`, `views_dir()` or `.env`.
+
+`project_root()` in this repository *is* this repository, so anything touching an application needs one to exist at
+that root. `tests/bootstrap.php` symlinks `tests/Fixtures/app` to `./app` and writes a `.env` if absent; both are
+gitignored. Add fixtures there rather than mocking the path helpers.
+
+PHPStan runs at level 5 over `src` and `tests` (`composer analyse`). Fixtures are excluded deliberately — they
+contain classes that are wrong on purpose.
+
+Cover behaviour that consumers depend on: route resolution order (static wins over dynamic), group prefixing, the
+path helpers, CSRF acceptance and rejection, and the stub placeholder contract.
 
 ## Where a change belongs
 

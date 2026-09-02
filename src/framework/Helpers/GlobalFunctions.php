@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Composer\InstalledVersions;
 
 function project_root(): string
@@ -60,7 +62,9 @@ function env(string $key): ?string
     try {
         return $env->getEnv($key);
     } catch (\Exception $e) {
-        logger($e, 'error');;
+        // the message, not the exception — logger() takes a string, and an
+        // Exception coerced to one drags its whole stack trace into the log
+        logger($e->getMessage(), 'error');
         return null;
     }
 }

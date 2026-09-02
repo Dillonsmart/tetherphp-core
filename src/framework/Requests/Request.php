@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace TetherPHP\framework\Requests;
 
 use TetherPHP\framework\Interfaces\RequestInterface;
@@ -35,7 +37,8 @@ class Request implements RequestInterface
 
     public float|string $startTime;
 
-    protected string $csrfToken;
+    // null until a CsrfToken has been generated for the session
+    protected ?string $csrfToken = null;
 
     /**
      * @throws \Exception
@@ -48,16 +51,20 @@ class Request implements RequestInterface
         $this->csrfToken = $session->get('csrf_token');
 
         if(in_array(strtoupper($method), ['POST', 'PUT', 'PATCH', 'DELETE'])) {
-            $this->validateCsrfToken($_POST['csrf_token']);
+            $this->validateCsrfToken($_POST['csrf_token'] ?? null);
         }
     }
 
     /**
+     * A request with no token, or one made against a session that never had a
+     * token generated, is rejected the same way a mismatched token is — it must
+     * not be able to crash its way past validation.
+     *
      * @throws \Exception
      */
-    public function validateCsrfToken(string $token): void
+    public function validateCsrfToken(?string $token): void
     {
-        if(!hash_equals($this->csrfToken, $token)) {
+        if ($this->csrfToken === null || $token === null || !hash_equals($this->csrfToken, $token)) {
             throw new \Exception('Invalid CSRF token');
         }
     }

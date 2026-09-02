@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace TetherPHP;
 
 use TetherPHP\framework\DTOs\RouteDTO;
@@ -93,14 +95,8 @@ class Router {
             'POST' => []
         ];
 
+        // routes registered inside the callback pick up $this->prefix as they go
         $callback($this);
-
-        foreach ($this->routes as $method => $uris) {
-            foreach ($uris as $uri => $action) {
-                $this->routes[$method]["{$uri}"] = $action;
-            }
-        }
-
 
         $this->routes['GET'] = array_merge($originalRoutes['GET'], $this->routes['GET']);
         $this->routes['POST'] = array_merge($originalRoutes['POST'], $this->routes['POST']);
