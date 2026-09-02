@@ -1,9 +1,6 @@
----
-name: tetherphp-principles
-description: The six core principles that govern TetherPHP's design, and how to apply them when making a decision. Use when adding a feature or API to the framework, choosing between implementation approaches, reviewing a change, deciding whether something belongs in the core at all, or when a change adds configuration, indirection or a second way to do an existing thing.
----
-
 # The six core principles of TetherPHP
+
+> Read this when adding a feature or API, choosing between implementation approaches, reviewing a change, deciding whether something belongs in the core at all, or when a change adds configuration, indirection or a second way to do an existing thing.
 
 These govern what goes into the framework and how it is shaped. They are design constraints, not marketing. When a
 change conflicts with one, the change is wrong until argued otherwise — and the argument belongs in the commit
@@ -89,7 +86,7 @@ For any change to the framework:
 - Does this belong in the core, or could it be a package?
 - Is there tooling that makes this visible?
 
-## Keeping this skill current
+## Keeping this guide current
 
-If a principle is changed, added or dropped, update this file, both repositories' `AGENTS.md`, and any skill that
+If a principle is changed, added or dropped, update this file, both repositories' `AGENTS.md`, and any guide that
 cites them, in the same commit.

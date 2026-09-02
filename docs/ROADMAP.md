@@ -5,6 +5,8 @@ Ordered by dependency: Phases 2 and 3 are both breaking and ship together so con
 
 Current: `v0.3.0`. Target: `v1.0`.
 
+Items struck through below have landed since this roadmap was written.
+
 ## The spine
 
 ```
@@ -22,8 +24,11 @@ Read from the current source, not inferred. The principle named is the one the d
 | Finding | Why it matters | Offends |
 | --- | --- | --- |
 | `Kernel::run()` exits three ways | The response is emitted from three places, so it cannot be tested, wrapped or inspected | Explicit |
+| ~~Error handler made every warning fatal~~ **fixed** | A deprecation notice replaced the page with a 500. Now only `E_ERROR`-class errors are fatal; the rest are logged | Human First |
+| ~~`tether` discarded command exit codes~~ **fixed** | Every invocation exited `0`, so no script or CI job could detect a failure | Agent Ready |
+| ~~`make:command` hardcoded the command name~~ **fixed** | Every generated command claimed `tetherphp:command` and collided in the registry | One Obvious Way |
 | No `Response` object | The last stage of the stated pipeline has no representation in code | Explicit |
-| `$_SERVER['CONTENT_TYPE']` read unguarded | Warns on every GET; masked only because `APP_DEBUG=false` silences it | Human First |
+| ~~`$_SERVER['CONTENT_TYPE']` read unguarded~~ **fixed** | Warned on every GET. The error handler treated *any* warning as fatal, so every page served the 500 view — and because `exit(500)` sets a process code rather than an HTTP one, it did so with a `200` status | Human First |
 | `Request::$csrfToken` is `string` | `Session::get()` returns null when no token exists — TypeError on a fresh session | Human First |
 | `validateCsrfToken($_POST['csrf_token'])` | Undefined array key on a POST without the field, before validation can reject it | Human First |
 | `RouteDTO` uses uninitialised properties | "Not found" is signalled by `isset($route->action)` — absence-as-control-flow | Agent Ready |
@@ -45,8 +50,8 @@ Read from the current source, not inferred. The principle named is the one the d
 Nothing new. Stop the framework lying about what it does.
 
 - `declare(strict_types=1)` across `src/`, and a return type on every method.
-- Fix the four correctness defects: unguarded `CONTENT_TYPE`, the nullable CSRF token, the missing `$_POST` key, and
-  the no-op loop in `Router::group()`.
+- ~~Unguarded `CONTENT_TYPE`~~ **done**, and ~~the error handler treating warnings as fatal~~ **done**. Still open:
+  the nullable CSRF token, the missing `$_POST` key, and the no-op loop in `Router::group()`.
 - Command registration fails **loudly** — a class that cannot be loaded or does not extend `Command` reports why.
 - PHPStan at max, plus GitHub Actions running tests and analysis on both repositories.
 - An integration harness (a fixture application inside `tests/`) so `app_dir()`-dependent behaviour is testable
@@ -120,9 +125,9 @@ an interface with one implementation and no prospect of a second is complexity c
 
 ## Phase 6 — Surface · `v1.0` track
 
-- Move the documentation website out of the skeleton into its own project. The `Docs` action, domain, responder and
-  its view files are the website, not a starting point — every generated application currently inherits them.
-- Reduce the skeleton to a genuine minimum: one route, one ADR triple, one view.
+- ~~Move the documentation website out of the skeleton into its own project.~~ **done** — it now lives in the
+  private `tetherphp-website` repository, itself built on TetherPHP.
+- ~~Reduce the skeleton to a genuine minimum: one route, one ADR triple, one view.~~ **done**.
 - Generate reference documentation from `tether context` and `tether explain`, so docs cannot drift.
 - Stabilise the public API and commit to semantic versioning at 1.0, where the major becomes the breaking signal.
 
@@ -133,7 +138,7 @@ developer must first delete.
 
 **Why the minor number is the breaking signal.** Composer reads `^0.3` as locked to the `0.3` series — it will not
 accept `0.4.0`. Until 1.0 every breaking change is a minor bump, and the skeleton's constraint must be bumped and
-pushed in the same release or `create-project` resolves a mismatched pair. See the **core-release** skill.
+pushed in the same release or `create-project` resolves a mismatched pair. See `docs/agents/releasing.md`.
 
 **The tension to expect.** Phase 4 adds substantial surface area, which reads as a conflict with Small & Composable.
 It is not: tooling is not a dependency of the running application. Keep the runtime small and let the CLI be

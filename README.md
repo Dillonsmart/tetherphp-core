@@ -68,7 +68,7 @@ composer test
 
 ## Local development against the skeleton app
 
-See `.claude/skills/tetherphp-local-dev/SKILL.md` in this repository for the linked-checkout workflow, or the
+See `docs/agents/linked-core-development.md` in this repository for the linked-checkout workflow, or the
 "Local Development" section of the skeleton application's README.
 
 ## Releasing

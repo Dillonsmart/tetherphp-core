@@ -1,9 +1,6 @@
----
-name: core-release
-description: Release a new version of the tetherphp-core package and coordinate the skeleton application's version constraint. Use when tagging a release, when a change would break consumers, or when deciding what version number a change deserves.
----
-
 # Releasing tetherphp-core
+
+> Read this when tagging a release, when a change would break consumers, or when deciding what version number a change deserves.
 
 `dillonsmart/tetherphp-core` is published to Packagist from this repository's git tags. There is no build step and no
 split — a tag is the release.
@@ -65,7 +62,7 @@ Order of operations:
 If the skeleton's constraint names a version that is not yet tagged here, `create-project` is broken for everyone —
 that is the failure mode to check for first when someone reports a fresh install not working.
 
-## Keeping this skill current
+## Keeping this guide current
 
 If the release process changes — a build step appears, versioning moves to 1.x and the major becomes the breaking
 signal, or the skeleton's coordination changes — update this file in the same commit.

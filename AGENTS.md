@@ -35,13 +35,16 @@ composer test          # PHPUnit 11, suite in tests/Unit
 Requires **PHP >= 8.4**. Property hooks, interface property declarations and parenthesis-free `new` are used
 throughout and are load-bearing — do not rewrite them into pre-8.4 forms.
 
-## Skills
+## Guides
 
-Detailed working knowledge lives in `.claude/skills/`. Read the relevant one before making changes:
+Detailed working knowledge lives in `docs/agents/`. These are plain markdown and tool-agnostic — read the relevant
+one before making changes:
 
-- **core-framework** — layout, the `project_root()` / `package_root()` / `core_dir()` rule, PHP 8.4 features in use,
+- [`docs/agents/principles.md`](docs/agents/principles.md) — the six principles in full, with a review checklist.
+- [`docs/agents/framework.md`](docs/agents/framework.md) — layout, the path-helper rule, PHP 8.4 features in use,
   adding console commands and stubs, what belongs here versus in the skeleton.
-- **core-release** — tagging, pre-1.0 version semantics, and coordinating the skeleton's version constraint.
+- [`docs/agents/releasing.md`](docs/agents/releasing.md) — tagging, pre-1.0 version semantics, and coordinating the
+  skeleton's version constraint.
 
 ## The rule that catches people out
 
@@ -71,7 +74,7 @@ placeholder contract.
 
 ## Keeping documentation current
 
-The skills in `.claude/skills/` are part of the source, not documentation about it. When a change makes one of them
-inaccurate — a moved directory, a renamed helper, a new stub placeholder, a changed release step — update the skill
+The guides in `docs/agents/` are part of the source, not documentation about it. When a change makes one of them
+inaccurate — a moved directory, a renamed helper, a new stub placeholder, a changed release step — update the guide
 in the **same commit** as the change, along with this file and `README.md` where they are affected. A skill that has
 drifted is worse than no skill.

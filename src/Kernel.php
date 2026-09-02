@@ -68,7 +68,8 @@ class Kernel
             return '';
         }
 
-        if ($_SERVER['CONTENT_TYPE'] === 'application/json') {
+        // CONTENT_TYPE is absent on any request without a body, which is most of them
+        if (($_SERVER['CONTENT_TYPE'] ?? '') === 'application/json') {
             $this->request->payload = json_decode(file_get_contents('php://input'), true) ?? [];
         } else {
             $this->request->payload = $_POST ?? [];
@@ -90,15 +91,47 @@ class Kernel
 
         set_error_handler(function ($errno, $errstr, $errfile, $errline) {
             Log::error("Error [$errno]: $errstr in $errfile on line $errline");
-            include(views_dir() . 'errors/500.php');
-            exit(500);
+
+            // Notices, warnings and deprecations are logged, not fatal. Replacing
+            // the page with a 500 because something was deprecated hides the real
+            // response and tells the user nothing.
+            $fatal = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR, E_RECOVERABLE_ERROR];
+
+            if (!in_array($errno, $fatal, true)) {
+                return true;
+            }
+
+            $this->renderFatalError();
         });
 
         set_exception_handler(function ($exception) {
             Log::error("Uncaught Exception: " . $exception->getMessage());
             Log::error("Uncaught Exception: " . $exception->getTraceAsString());
-            include(views_dir() . 'errors/500.php');
-            exit(500);
+
+            $this->renderFatalError();
         });
+    }
+
+    /**
+     * Renders the 500 page and stops. Guarded against re-entry so that an error
+     * inside the error view cannot recurse through the handler.
+     */
+    private function renderFatalError(): never
+    {
+        static $rendering = false;
+
+        if (!$rendering) {
+            $rendering = true;
+
+            // exit() sets a process status, not an HTTP one — the response code has
+            // to be set explicitly or the error page is served as a 200
+            if (!headers_sent()) {
+                http_response_code(500);
+            }
+
+            include(views_dir() . 'errors/500.php');
+        }
+
+        exit(1);
     }
 }

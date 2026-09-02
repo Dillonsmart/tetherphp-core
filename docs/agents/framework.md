@@ -1,9 +1,6 @@
----
-name: core-framework
-description: Conventions and invariants for the TetherPHP core framework package. Use when changing anything under src/ in this repository — routing, requests, sessions, console commands, stubs, path helpers or error views — or when deciding whether a change belongs in the framework or in the skeleton application.
----
+# Working on the framework
 
-# Working on tetherphp-core
+> Read this before changing anything under `src/` — routing, requests, sessions, console commands, stubs, path helpers or error views — or when deciding whether a change belongs in the framework or in the skeleton application.
 
 This repository is the **source of truth** for the TetherPHP framework. It is published to Packagist as
 `dillonsmart/tetherphp-core` and consumed by the `dillonsmart/tetherphp` skeleton application.
@@ -13,7 +10,7 @@ which force-pushed over this repository's history. That workflow is gone — nev
 
 ## Design constraints
 
-Every change here answers to the six core principles — see the **tetherphp-principles** skill. The two that most often
+Every change here answers to the six core principles — see the principles guide (`docs/agents/principles.md`). The two that most often
 decide a framework change: **Small & Composable** (could this be a package instead of core?) and **One Obvious Way**
 (does this add a second way to do something that already works?).
 
@@ -125,9 +122,9 @@ path helpers.
 
 That last row matters: the framework is a library and must not `use` an application namespace.
 
-## Keeping this skill current
+## Keeping this guide current
 
-These skills are part of the source, not documentation about it. When a change makes anything above inaccurate —
+These guides are part of the source, not documentation about it. When a change makes anything above inaccurate —
 a moved directory, a new or renamed path helper, a changed PHP requirement, a new stub placeholder, a change to how
-commands register — update this file in the same commit. The same applies to `.claude/skills/core-release/SKILL.md`
+commands register — update this file in the same commit. The same applies to `docs/agents/releasing.md`
 if the release flow changes, and to `README.md`.
