@@ -5,9 +5,10 @@ use Composer\InstalledVersions;
 function project_root(): string
 {
     $rootPackage = InstalledVersions::getRootPackage();
-    // path to the root project
 
-    return rtrim($rootPackage['install_path'], '/');
+    // Composer reports this relative to vendor/composer, so resolve it rather
+    // than handing '<root>/vendor/composer/../..' to every other path helper
+    return realpath($rootPackage['install_path']) ?: rtrim($rootPackage['install_path'], '/');
 }
 
 function package_root(): string
