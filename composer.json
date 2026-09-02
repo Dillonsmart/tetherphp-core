@@ -3,16 +3,32 @@
   "description": "The core framework files for TetherPHP.",
   "type": "library",
   "license": "MIT",
+  "keywords": ["tetherphp", "framework", "adr"],
   "autoload": {
     "psr-4": {
-      "TetherPHP\\": ""
+      "TetherPHP\\": "src/"
     },
     "files": [
-      "framework/Helpers/GlobalFunctions.php"
+      "src/framework/Helpers/GlobalFunctions.php"
     ]
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "TetherPHP\\Tests\\": "tests/"
+    }
   },
   "require": {
     "php": ">=8.4"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.5"
+  },
+  "scripts": {
+    "test": "phpunit",
+    "test:coverage": "phpunit --coverage-text"
+  },
+  "config": {
+    "sort-packages": true
   },
   "minimum-stability": "dev",
   "prefer-stable": true

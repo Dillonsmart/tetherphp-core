@@ -7,11 +7,12 @@ function project_root(): string
     $rootPackage = InstalledVersions::getRootPackage();
     // path to the root project
 
-    return $rootPackage['install_path'];
+    return rtrim($rootPackage['install_path'], '/');
 }
 
 function package_root(): string
 {
+    // this file lives at <package>/src/framework/Helpers/
     return dirname(__DIR__, 3);
 }
 
@@ -37,7 +38,9 @@ function public_dir(): string
 
 function core_dir(): string
 {
-    return package_root() . '/src/framework';
+    // resolved relative to this file rather than the package root, so it holds
+    // wherever Composer installs the package
+    return dirname(__DIR__);
 }
 
 function core_views(): string

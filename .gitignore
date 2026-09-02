@@ -1,0 +1,6 @@
+.idea
+.DS_Store
+.phpunit.result.cache
+/.phpunit.cache
+/TODO.md
+/vendor
