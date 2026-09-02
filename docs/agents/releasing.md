@@ -28,6 +28,19 @@ git push origin main --tags
 
 Packagist picks the tag up from the repository hook.
 
+## Never move a published tag
+
+Packagist reads a version **once**. Force-updating a tag to point at a different commit does not make Packagist
+re-read it — the old tree stays published under that version number, and anyone who already resolved it has it in
+their lock file.
+
+This has happened: `v0.3.0` was tagged on the wrong commit, force-moved to the right one, and Packagist went on
+serving the original tree regardless.
+
+So if a tag goes out wrong, **burn the version and release the next patch**. Do not move it. The bad version stays
+on Packagist, which means consumers must skip past it — constrain to `^0.3.1`, not `^0.3`, because `^0.3` would
+happily resolve the broken `0.3.0`. Delete the bad version from the Packagist UI if you can.
+
 ## Versioning while pre-1.0
 
 Composer treats `^0.Y.Z` as locked to the `0.Y` series, so **the minor number is the breaking-change signal**: `^0.3`
