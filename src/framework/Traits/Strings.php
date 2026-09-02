@@ -13,4 +13,14 @@ trait Strings
     {
         return $this->toPascalCase($string);
     }
+
+    public function toKebabCase(string $string): string
+    {
+        $string = str_replace(['-', '_'], ' ', $string);
+
+        // split on camel/pascal boundaries, leaving runs of capitals intact
+        $string = preg_replace('/(?<!^)(?<![A-Z ])([A-Z])/', ' $1', $string);
+
+        return strtolower(str_replace(' ', '-', preg_replace('/\s+/', ' ', trim($string))));
+    }
 }

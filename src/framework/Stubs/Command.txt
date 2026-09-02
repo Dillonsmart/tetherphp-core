@@ -6,8 +6,8 @@ use TetherPHP\framework\Commands\Command;
 
 class {{className}} extends Command
 {
-    // 'php tether tetherphp:command'
-    public string $command = 'tetherphp:command';
+    // 'php tether {{commandName}}'
+    public string $command = '{{commandName}}';
 
     public string $description = '';
 

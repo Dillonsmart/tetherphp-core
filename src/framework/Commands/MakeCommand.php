@@ -18,9 +18,25 @@ class MakeCommand extends Command
 
     public function execute()
     {
+        $name = $this->argument('name');
+
+        if (empty($name)) {
+            $this->error("Command name cannot be empty.");
+            return self::COMMAND_INVALID_ARGUMENT;
+        }
+
+        // 'send-emails', 'SendEmails' and 'SendEmailsCommand' all name the same command
+        $baseName = preg_replace('/Command$/', '', $this->toValidClassName($name));
+
+        if (empty($baseName)) {
+            $this->error("'{$name}' is not a valid command name.");
+            return self::COMMAND_INVALID_ARGUMENT;
+        }
+
         $this->createCommandDirectory();
 
-        $className = $this->toValidClassName($this->argument('name')) . 'Command';
+        $className = $baseName . 'Command';
+        $commandName = $this->toKebabCase($baseName);
 
         $commandFilePath = app_dir() . "/Commands/{$className}.php";
 
@@ -30,7 +46,11 @@ class MakeCommand extends Command
         }
 
         $template = file_get_contents(core_dir() . '/Stubs/Command.txt');
-        $template = str_replace('{{className}}', $className, $template);
+        $template = str_replace(
+            ['{{className}}', '{{commandName}}'],
+            [$className, $commandName],
+            $template
+        );
 
         if (file_put_contents($commandFilePath, $template) === false) {
             $this->error("Failed to create command file: {$commandFilePath}");
@@ -38,6 +58,7 @@ class MakeCommand extends Command
         }
 
         $this->success("Command created successfully: {$commandFilePath}");
+        $this->info("Run it with: php tether {$commandName}");
         return self::COMMAND_SUCCESS;
     }
 

@@ -11,6 +11,12 @@ This repository is the **source of truth** for the TetherPHP framework. It is pu
 It is not generated from anything. (It used to be produced by splitting the skeleton's `src/` with `splitsh-lite`,
 which force-pushed over this repository's history. That workflow is gone — never reintroduce it.)
 
+## Design constraints
+
+Every change here answers to the six core principles — see the **tetherphp-principles** skill. The two that most often
+decide a framework change: **Small & Composable** (could this be a package instead of core?) and **One Obvious Way**
+(does this add a second way to do something that already works?).
+
 ## Layout
 
 ```
@@ -77,8 +83,21 @@ skeleton's `composer.json`.
 
 ## Stubs
 
-`make:*` commands read `core_dir() . '/Stubs/*.txt'` and substitute `{{className}}`. Adding a placeholder means
-updating both the stub and the command that renders it.
+`make:*` commands read `core_dir() . '/Stubs/*.txt'` and substitute placeholders. The supported set is:
+
+| Placeholder       | Substituted by                | Used in       |
+| ----------------- | ----------------------------- | ------------- |
+| `{{className}}`   | all `make:*` commands         | every stub    |
+| `{{commandName}}` | `MakeCommand`                 | `Command.txt` |
+
+A placeholder no generator substitutes is emitted literally into the developer's file, so the set is a contract —
+`tests/Unit/StubsTest.php` enforces it. Adding one means updating the stub, the command that renders it, and that test.
+
+`make:command` derives both names from one argument: `send-welcome-email`, `SendWelcomeEmail` and
+`SendWelcomeEmailCommand` all produce class `SendWelcomeEmailCommand` and command name `send-welcome-email`. The
+class name is `toValidClassName()` with any redundant `Command` suffix stripped; the command name is
+`toKebabCase()` of that. `Command.txt` used to hardcode `tetherphp:command`, so every generated command collided in
+the registry — do not reintroduce a literal command name into a stub.
 
 ## Tests
 
