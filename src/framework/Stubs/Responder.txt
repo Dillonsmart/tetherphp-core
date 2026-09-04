@@ -6,6 +6,6 @@ class {{className}} extends Responder
 {
     public function __invoke(array $data = []): string
     {
-        // return $this->view('path.to.view', $data);
+        return $this->view('pages.{{viewName}}.index', $data);
     }
 }

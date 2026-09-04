@@ -108,6 +108,37 @@ class CsrfProtectionTest extends TestCase
         new Request($this->session, $method, '/contact', microtime(true));
     }
 
+    /**
+     * PHP only fills $_POST for POST bodies, so a token could previously never
+     * be presented on PUT, PATCH or DELETE — those methods were unusable.
+     */
+    public function testAcceptsATokenFromTheHeaderOnMethodsWithoutFormBodies(): void
+    {
+        $token = $this->withToken();
+        $_POST = [];
+        $_SERVER['HTTP_X_CSRF_TOKEN'] = $token;
+
+        $request = new Request($this->session, 'PUT', '/thing/1', microtime(true));
+
+        $this->assertSame('PUT', $request->method);
+
+        unset($_SERVER['HTTP_X_CSRF_TOKEN']);
+    }
+
+    public function testRejectsAWrongTokenInTheHeader(): void
+    {
+        $this->withToken();
+        $_POST = [];
+        $_SERVER['HTTP_X_CSRF_TOKEN'] = 'not-the-token';
+
+        try {
+            $this->expectException(\Exception::class);
+            new Request($this->session, 'DELETE', '/thing/1', microtime(true));
+        } finally {
+            unset($_SERVER['HTTP_X_CSRF_TOKEN']);
+        }
+    }
+
     public function testReadsAreNotChallenged(): void
     {
         $this->withToken();

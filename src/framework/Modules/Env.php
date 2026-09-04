@@ -40,16 +40,31 @@ class Env
         }
 
         $envContent = file_get_contents($envFile) ?: '';
-        $lines = explode("\n", $envContent);
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line && !str_starts_with($line, '#')) {
-                [$key, $value] = explode('=', $line, 2);
-                $key = trim($key);
-                $value = trim($value, "\"'");
 
-                $this->envVars[$key] = $value;
+        foreach (preg_split('/\R/', $envContent) ?: [] as $line) {
+            $line = trim($line);
+
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
             }
+
+            // a line with no '=' is not a variable; skipping it beats destructuring
+            // a one-element array and warning about the missing offset
+            if (!str_contains($line, '=')) {
+                continue;
+            }
+
+            [$key, $value] = explode('=', $line, 2);
+
+            $key = trim($key);
+            $value = trim($value);
+
+            // strip a trailing unquoted comment: APP_ENV=local # dev only
+            if (!str_starts_with($value, '"') && !str_starts_with($value, "'")) {
+                $value = trim(preg_replace('/\s+#.*$/', '', $value) ?? $value);
+            }
+
+            $this->envVars[$key] = trim($value, "\"'");
         }
     }
 

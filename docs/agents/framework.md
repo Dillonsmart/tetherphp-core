@@ -95,6 +95,7 @@ skeleton's `composer.json`.
 | ----------------- | ----------------------------- | ------------- |
 | `{{className}}`   | all `make:*` commands         | every stub    |
 | `{{commandName}}` | `MakeCommand`                 | `Command.txt` |
+| `{{viewName}}`    | `MakeFeatureCommand`          | `Responder.txt`, `View.txt` |
 
 A placeholder no generator substitutes is emitted literally into the developer's file, so the set is a contract —
 `tests/Unit/StubsTest.php` enforces it. Adding one means updating the stub, the command that renders it, and that test.
@@ -104,6 +105,20 @@ A placeholder no generator substitutes is emitted literally into the developer's
 class name is `toValidClassName()` with any redundant `Command` suffix stripped; the command name is
 `toKebabCase()` of that. `Command.txt` used to hardcode `tetherphp:command`, so every generated command collided in
 the registry — do not reintroduce a literal command name into a stub.
+
+## Request handling invariants
+
+- **Route on the path, not `REQUEST_URI`.** The Kernel strips the query string with `parse_url`; routing on the raw
+  value meant any URL carrying parameters 404'd.
+- **Never index `$routes[$method]` directly.** Only GET and POST can be registered, so any other verb used to hit a
+  missing key and take the request down with a TypeError. `Router::routesFor()` is the only accessor; it defaults to
+  an empty table and answers HEAD from the GET one.
+- **Error pages go through `Kernel::errorView()`**, which prefers the application's `app/Views/errors/{status}.php`
+  and falls back to the framework's own. It returns the body rather than echoing it, so `run()` returns what it says
+  it returns.
+- **A rejected write is a 403, not a 500.** CSRF failures are caught in `run()`.
+- **The CSRF token is read from `$_POST` or the `X-CSRF-Token` header.** PHP only populates `$_POST` for POST
+  bodies, so header support is what makes PUT, PATCH and DELETE authorisable at all.
 
 ## Tests
 

@@ -108,15 +108,16 @@ class Router {
 
     public function routeAction(Request $request): RouteDTO {
         $routeObject = new RouteDTO();
+        $routes = $this->routesFor($request->method);
 
-        if(array_key_exists($request->uri, $this->routes[$request->method])) {
-            $routeObject->action = $this->routes[$request->method][$request->uri]['action'] ?? null;
-            $routeObject->type = $this->routes[$request->method][$request->uri]['type'] ?? null;
+        if(array_key_exists($request->uri, $routes)) {
+            $routeObject->action = $routes[$request->uri]['action'];
+            $routeObject->type = $routes[$request->uri]['type'];
 
             return $routeObject;
         }
 
-        foreach ($this->routes[$request->method] as $uri => $route) {
+        foreach ($routes as $uri => $route) {
             if ($route['type'] === 'dynamic') {
                 $parts = explode('/', $uri);
                 $requestParts = explode('/', $request->uri);
@@ -141,10 +142,33 @@ class Router {
                     $routeObject->action = $route['action'];
                     $routeObject->type = 'dynamic';
                     $routeObject->params = $params;
+
+                    // first match wins; without this the last registered route
+                    // silently overwrote every earlier one
+                    return $routeObject;
                 }
             }
         }
 
         return $routeObject;
+    }
+
+    /**
+     * Routes registered for a method.
+     *
+     * Only GET and POST can be registered, so any other verb — HEAD from a link
+     * checker, OPTIONS from a CORS preflight — used to index a missing key and
+     * take the whole request down with a TypeError. HEAD is answered from the
+     * GET table because HTTP defines it as GET without a body.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function routesFor(string $method): array
+    {
+        if ($method === 'HEAD') {
+            $method = 'GET';
+        }
+
+        return $this->routes[$method] ?? [];
     }
 }

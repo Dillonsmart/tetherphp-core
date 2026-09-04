@@ -20,6 +20,8 @@ class MakeFeatureCommand extends Command
 
     private string $className;
 
+    private string $viewName;
+
     public function execute(): int
     {
         $featureName = $this->argument('name');
@@ -30,6 +32,7 @@ class MakeFeatureCommand extends Command
         }
 
         $this->className = $this->toValidClassName($featureName);
+        $this->viewName = $this->toKebabCase($this->className);
 
         $actionResult = $this->createAction();
         if ($actionResult !== self::COMMAND_SUCCESS) {
@@ -44,6 +47,13 @@ class MakeFeatureCommand extends Command
         $responderResult = $this->createResponder();
         if ($responderResult !== self::COMMAND_SUCCESS) {
             return $responderResult;
+        }
+
+        // the generated Responder renders this view, so the feature has to ship
+        // with it or `make:feature` produces code that throws on first request
+        $viewResult = $this->createView();
+        if ($viewResult !== self::COMMAND_SUCCESS) {
+            return $viewResult;
         }
 
         $this->success("Feature '{$this->className}' created successfully.\n");
@@ -105,12 +115,37 @@ class MakeFeatureCommand extends Command
         return self::COMMAND_SUCCESS;
     }
 
+    private function createView(): int
+    {
+        $viewDir = app_dir() . "/Views/pages/{$this->viewName}";
+
+        if (!is_dir($viewDir) && !mkdir($viewDir, 0755, true) && !is_dir($viewDir)) {
+            $this->error("Failed to create view directory: {$viewDir}\n");
+            return self::COMMAND_ERROR;
+        }
+
+        $viewFilePath = $viewDir . '/index.php';
+
+        if (file_exists($viewFilePath)) {
+            $this->error("View already exists: {$viewFilePath}\n");
+            return self::COMMAND_ERROR;
+        }
+
+        if (file_put_contents($viewFilePath, $this->generateTemplate('/Stubs/View.txt')) === false) {
+            $this->error("Failed to create view: {$viewFilePath}\n");
+            return self::COMMAND_ERROR;
+        }
+
+        $this->success("View created successfully: {$viewFilePath}\n");
+        return self::COMMAND_SUCCESS;
+    }
+
     private function generateTemplate(string $template): string
     {
         $template = file_get_contents(core_dir() . $template) ?: '';
         return str_replace(
-            ['{{className}}'],
-            [$this->className],
+            ['{{className}}', '{{viewName}}'],
+            [$this->className, $this->viewName],
             $template
         );
     }

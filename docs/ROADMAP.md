@@ -64,7 +64,14 @@ Nothing new. Stop the framework lying about what it does.
 - ~~An integration harness (a fixture application inside `tests/`)~~ **done** — `tests/Fixtures/app`, linked into
   place by the bootstrap, with a `tests/Feature` suite.
 
-**Phase 1 is complete.** What it could not reach, and why:
+**Phase 1 is complete.** A follow-up review then found a further set of defects that neither the tests nor PHPStan
+could see, all fixed in `v0.3.4`: every non-GET/POST request returned 500; any URL with a query string 404'd; the
+skeleton's `Responder::view()` let view data rebind `$file` after its existence check and include an arbitrary path;
+route parameters were captured and discarded; `make:feature` generated a Responder that fataled on first use;
+`boilerplate:clear` deleted the base Action class and missed nested files; sessions had no cookie hardening; and
+CSRF could never pass on PUT, PATCH or DELETE.
+
+What Phase 1 could not reach, and why:
 
 - **PHPStan level 9** — blocked structurally. `Session::get()` returns `mixed` and `$_SERVER`/`$_POST` enter
   untyped, so everything derived from them is `mixed`. Typing that boundary is Phase 2/3.

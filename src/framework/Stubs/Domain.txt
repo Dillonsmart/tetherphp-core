@@ -4,6 +4,9 @@ namespace Domains;
 
 class {{className}} extends Domain
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function handle(): array
     {
         return [];

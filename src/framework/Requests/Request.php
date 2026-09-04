@@ -52,8 +52,23 @@ class Request implements RequestInterface
         $this->csrfToken = $session->get('csrf_token');
 
         if(in_array(strtoupper($method), ['POST', 'PUT', 'PATCH', 'DELETE'])) {
-            $this->validateCsrfToken($_POST['csrf_token'] ?? null);
+            $this->validateCsrfToken($this->submittedCsrfToken());
         }
+    }
+
+    /**
+     * The token a write request presented, if any.
+     *
+     * PHP only populates $_POST for POST bodies, so reading the token from
+     * there alone made PUT, PATCH and DELETE impossible to authorise — they
+     * could never present a token and so always failed validation. The header
+     * is how those methods, and fetch/XHR clients generally, send it.
+     */
+    private function submittedCsrfToken(): ?string
+    {
+        $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+
+        return is_string($token) ? $token : null;
     }
 
     /**

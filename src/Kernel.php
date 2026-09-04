@@ -50,14 +50,25 @@ class Kernel
      */
     public function run()
     {
-        $this->request = new Request($this->session, $_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI'], microtime(true));
+        try {
+            $this->request = new Request(
+                $this->session,
+                $this->requestMethod(),
+                $this->requestPath(),
+                microtime(true),
+            );
+        } catch (\Exception $e) {
+            // A rejected write is a client error, not a server one. Uncaught, it
+            // reached the exception handler and was reported as a 500.
+            Log::error('Rejected request: ' . $e->getMessage());
+
+            return $this->errorView(403);
+        }
 
         $route = $this->router->routeAction($this->request);
 
         if (!isset($route->action)) {
-            http_response_code(404);
-            include(views_dir() . 'errors/404.php');
-            return '';
+            return $this->errorView(404);
         }
 
         if ($route->type === 'view') {
@@ -67,9 +78,9 @@ class Kernel
         }
 
         if (!class_exists($route->action)) {
-            http_response_code(500);
-            include(views_dir() . 'errors/500.php');
-            return '';
+            Log::error("Route points at {$route->action}, which does not exist.");
+
+            return $this->errorView(500);
         }
 
         // CONTENT_TYPE is absent on any request without a body, which is most of them
@@ -84,13 +95,68 @@ class Kernel
         if (!is_callable($invokeAction)) {
             Log::error("Action {$route->action} is not invokable — it needs an __invoke() method.");
 
-            http_response_code(500);
-            include(views_dir() . 'errors/500.php');
-
-            return '';
+            return $this->errorView(500);
         }
 
         return $invokeAction();
+    }
+
+    /**
+     * Sets the status and returns the rendered error page.
+     *
+     * The application's own view wins; the framework ships fallbacks so an
+     * application that has not written one still gets a page rather than an
+     * empty body from a failed include. Previously these were echoed directly
+     * and '' was returned, so run() did not actually return the response it
+     * claims to.
+     */
+    private function errorView(int $status): string
+    {
+        if (!headers_sent()) {
+            http_response_code($status);
+        }
+
+        $view = views_dir() . "errors/{$status}.php";
+
+        if (!file_exists($view)) {
+            $view = core_views() . "errors/{$status}.php";
+        }
+
+        if (!file_exists($view)) {
+            return "<h1>{$status}</h1>";
+        }
+
+        ob_start();
+        include $view;
+
+        return ob_get_clean() ?: '';
+    }
+
+    private function requestMethod(): string
+    {
+        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+        return is_string($method) ? $method : 'GET';
+    }
+
+    /**
+     * The path alone, without the query string.
+     *
+     * REQUEST_URI carries the query string, so routing on it raw meant any URL
+     * with parameters — pagination, a UTM tag, a filter — failed to match and
+     * returned a 404.
+     */
+    private function requestPath(): string
+    {
+        $uri = $_SERVER['REQUEST_URI'] ?? '/';
+
+        if (!is_string($uri) || $uri === '') {
+            return '/';
+        }
+
+        $path = parse_url($uri, PHP_URL_PATH);
+
+        return is_string($path) && $path !== '' ? $path : '/';
     }
 
     private function setErrorHandler(): void

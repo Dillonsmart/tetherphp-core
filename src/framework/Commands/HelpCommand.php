@@ -14,12 +14,23 @@ class HelpCommand extends Command
 
     public function execute(): int
     {
-        $console = new Console('');
+        // Registration diagnostics are written by the Console that dispatched
+        // this command; building a second one here printed them all twice.
+        $console = new Console('', errorStream: null);
+
         $this->info("Available commands:");
 
-        foreach($console->commands as $command) {
-            $commandInstance = new $command();
-            $this->info(" - {$commandInstance->command} - {$commandInstance->description}");
+        foreach ($console->commands as $command) {
+            $instance = new $command();
+            $this->info(" - {$instance->command} - {$instance->description}");
+        }
+
+        if ($console->skipped() !== []) {
+            $this->error("\nSome commands could not be registered:");
+
+            foreach ($console->skipped() as $reason) {
+                $this->error("  {$reason}");
+            }
         }
 
         return self::COMMAND_SUCCESS;

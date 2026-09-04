@@ -1,0 +1,6 @@
+<h1>{{className}}</h1>
+
+<p>
+    This view is <code>app/Views/pages/{{viewName}}/index.php</code>, rendered by
+    the <code>{{className}}</code> responder.
+</p>

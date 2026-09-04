@@ -13,7 +13,7 @@ class StubsTest extends TestCase
 
     public function testEveryStubIsReachableThroughCoreDir(): void
     {
-        foreach (['Action', 'Command', 'Domain', 'Responder'] as $stub) {
+        foreach (['Action', 'Command', 'Domain', 'Responder', 'View'] as $stub) {
             $this->assertFileExists(core_dir() . "/Stubs/{$stub}.txt");
         }
     }
@@ -41,14 +41,32 @@ class StubsTest extends TestCase
     }
 
     /**
+     * The Responder stub used to declare `: string` with its only return
+     * commented out, so every generated feature fataled on first request with
+     * "Return value must be of type string, none returned".
+     */
+    public function testResponderStubActuallyReturnsSomething(): void
+    {
+        $stub = $this->stub('Responder');
+
+        $this->assertMatchesRegularExpression('/\breturn\s+\$this->view\(/', $stub);
+        $this->assertStringNotContainsString('// return', $stub);
+    }
+
+    public function testResponderStubRendersTheViewMakeFeatureGenerates(): void
+    {
+        $this->assertStringContainsString("pages.{{viewName}}.index", $this->stub('Responder'));
+    }
+
+    /**
      * A placeholder no generator substitutes would be emitted literally into the
      * developer's file, so the set of placeholders is part of the contract.
      */
     public function testStubsUseOnlyKnownPlaceholders(): void
     {
-        $known = ['{{className}}', '{{commandName}}'];
+        $known = ['{{className}}', '{{commandName}}', '{{viewName}}'];
 
-        foreach (['Action', 'Command', 'Domain', 'Responder'] as $stub) {
+        foreach (['Action', 'Command', 'Domain', 'Responder', 'View'] as $stub) {
             preg_match_all('/\{\{[a-zA-Z]+\}\}/', $this->stub($stub), $matches);
 
             foreach (array_unique($matches[0]) as $placeholder) {
