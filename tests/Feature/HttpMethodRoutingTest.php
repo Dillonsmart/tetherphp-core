@@ -52,7 +52,7 @@ class HttpMethodRoutingTest extends TestCase
 
         $route = $this->router->routeAction($this->request($method));
 
-        $this->assertFalse(isset($route->action));
+        $this->assertFalse($route->matched);
     }
 
     /**
@@ -70,7 +70,7 @@ class HttpMethodRoutingTest extends TestCase
     {
         $route = $this->router->routeAction($this->request('HEAD', '/nope'));
 
-        $this->assertFalse(isset($route->action));
+        $this->assertFalse($route->matched);
     }
 
     /**

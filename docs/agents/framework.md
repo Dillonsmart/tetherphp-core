@@ -22,7 +22,8 @@ src/
 ├── Router.php          # registration, groups, static + dynamic matching
 └── framework/
     ├── Commands/       # built-in console commands
-    ├── DTOs/           # RouteDTO
+    ├── Http/           # Response
+    ├── Routing/        # Route
     ├── Helpers/        # GlobalFunctions.php (Composer `files`), Route
     ├── Interfaces/     # ActionInterface, RequestInterface, ResponderInterface
     ├── Modules/        # Console, Env, Log
@@ -106,6 +107,29 @@ class name is `toValidClassName()` with any redundant `Command` suffix stripped;
 `toKebabCase()` of that. `Command.txt` used to hardcode `tetherphp:command`, so every generated command collided in
 the registry — do not reintroduce a literal command name into a stub.
 
+## The pipeline
+
+`Kernel::run()` returns a `Response`. Every path through it does — a match, a
+miss, a rejected write, a misconfigured route. Nothing is echoed and nothing
+calls `exit()`, which is what makes the Kernel testable at all; it had no
+coverage until this changed.
+
+```
+Request → Route → Action → Domain → Responder → Response
+```
+
+- **`Response`** (`framework/Http`) is an immutable value: body, status, headers.
+  `send()` is the only place the framework writes to the client.
+- **`Route`** (`framework/Routing`) says whether it matched. It replaced
+  `RouteDTO`, which signalled "not found" by leaving a typed property
+  uninitialised for callers to test with `isset()`.
+- **Actions must implement `ActionInterface`** and return a `Response`. The
+  Kernel checks the instance and 500s with a log line if it does not; before,
+  only `is_callable` was checked.
+- **Route parameters arrive on the request** as `$request->params`. The router
+  always captured them and the Kernel dropped them, so applications re-parsed
+  the URI inside their own Actions.
+
 ## Request handling invariants
 
 - **Route on the path, not `REQUEST_URI`.** The Kernel strips the query string with `parse_url`; routing on the raw
@@ -113,7 +137,7 @@ the registry — do not reintroduce a literal command name into a stub.
 - **Never index `$routes[$method]` directly.** Only GET and POST can be registered, so any other verb used to hit a
   missing key and take the request down with a TypeError. `Router::routesFor()` is the only accessor; it defaults to
   an empty table and answers HEAD from the GET one.
-- **Error pages go through `Kernel::errorView()`**, which prefers the application's `app/Views/errors/{status}.php`
+- **Error pages go through `Kernel::errorResponse()`**, which prefers the application's `app/Views/errors/{status}.php`
   and falls back to the framework's own. It returns the body rather than echoing it, so `run()` returns what it says
   it returns.
 - **A rejected write is a 403, not a 500.** CSRF failures are caught in `run()`.

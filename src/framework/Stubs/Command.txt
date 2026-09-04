@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Commands;
 
 use TetherPHP\framework\Commands\Command;
@@ -14,6 +16,7 @@ class {{className}} extends Command
     public function execute(): int
     {
         $this->info('Executing {{className}}...');
+
         return self::COMMAND_SUCCESS;
     }
 }

@@ -4,69 +4,107 @@ declare(strict_types=1);
 
 namespace TetherPHP;
 
-use TetherPHP\framework\DTOs\RouteDTO;
 use TetherPHP\framework\Requests\Request;
+use TetherPHP\framework\Routing\Route;
 
-class Router {
-    /** @var array{GET: array<string, array<string, mixed>>, POST: array<string, array<string, mixed>>} */
-    public array $routes = [
-        'GET' => [],
-        'POST' => []
-    ];
+class Router
+{
+    /**
+     * Registered routes, keyed by method then URI.
+     *
+     * @var array<string, array<string, array{action: string, type: string}>>
+     */
+    public array $routes = [];
 
     public string $prefix = '';
 
-    public string $uri = '';
+    /**
+     * The verbs a route can be registered for. Request enforces CSRF on every
+     * one of these except GET, so the two halves have to agree about which
+     * verbs exist — previously only GET and POST could be registered while
+     * PUT, PATCH and DELETE were CSRF-checked but unroutable.
+     *
+     * @var list<string>
+     */
+    private const array METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
-    public string $action = '';
+    public function get(string $uri, string $action): void
+    {
+        $this->add('GET', $uri, $action);
+    }
 
-    public function view(string $uri, string $view): void {
+    public function post(string $uri, string $action): void
+    {
+        $this->add('POST', $uri, $action);
+    }
+
+    public function put(string $uri, string $action): void
+    {
+        $this->add('PUT', $uri, $action);
+    }
+
+    public function patch(string $uri, string $action): void
+    {
+        $this->add('PATCH', $uri, $action);
+    }
+
+    public function delete(string $uri, string $action): void
+    {
+        $this->add('DELETE', $uri, $action);
+    }
+
+    /**
+     * Renders a view with no Action behind it.
+     *
+     * Still a single path through the pipeline: the Kernel resolves it to the
+     * framework's own view rendering rather than a second way of handling a
+     * request.
+     */
+    public function view(string $uri, string $view): void
+    {
         $this->routes['GET'][$this->makeUri($uri)] = [
             'action' => $view,
-            'type' => 'view'
+            'type' => Route::TYPE_VIEW,
         ];
     }
 
-    public function get(string $uri, string $action): void {
-        $this->uri = $uri;
-        $this->action = $action;
+    public function group(string $prefix, callable $callback): void
+    {
+        if (empty($prefix)) {
+            throw new \InvalidArgumentException("Prefix cannot be empty.");
+        }
 
-        $this->routes['GET'][$this->makeUri($uri)] = $this->buildRoute();
+        if ($prefix[0] !== '/') {
+            $prefix = '/' . $prefix;
+        }
+
+        $previous = $this->prefix;
+        $this->prefix = $previous . $prefix;
+
+        // routes registered inside the callback pick up $this->prefix as they go
+        $callback($this);
+
+        $this->prefix = $previous;
     }
 
-    public function post(string $uri, string $action): void {
-        $this->uri = $uri;
-        $this->action = $action;
-
-        $this->routes['POST'][$this->makeUri($uri)] = $this->buildRoute();
-    }
-
-    public function makeUri(string $uri): string {
+    public function makeUri(string $uri): string
+    {
         return $this->prefix . $uri;
     }
 
-    /** @return array{action: string, type: string, parts: list<string>} */
-    public function buildRoute(): array
+    public function hasDynamicParts(string $uri): bool
     {
-        return [
-            'action' => $this->action,
-            'type' => $this->hasDynamicParts($this->uri) ? 'dynamic' : 'static',
-            'parts' => $this->hasDynamicParts($this->uri) ? $this->handleDynamicParts($this->uri) : []
-        ];
-    }
-
-    public function hasDynamicParts(string $uri): bool {
         return str_contains($uri, '{') && str_contains($uri, '}');
     }
 
-    /** @return list<string> */
+    /**
+     * @return list<string>
+     */
     public function handleDynamicParts(string $uri): array
     {
-        $dynamicParts = explode('{', $uri);
-
         $validParts = [];
 
-        foreach ($dynamicParts as $part) {
+        foreach (explode('{', $uri) as $part) {
             if (str_contains($part, '}')) {
                 $part = explode('}', $part)[0];
 
@@ -81,87 +119,85 @@ class Router {
         return $validParts;
     }
 
-    public function group(string $prefix, callable $callback): void {
-        if (empty($prefix)) {
-            throw new \InvalidArgumentException("Prefix cannot be empty.");
-        }
-
-        if ($prefix[0] !== '/') {
-            $prefix = '/' . $prefix;
-        }
-
-        $this->prefix = $prefix;
-
-        $originalRoutes = $this->routes;
-        $this->routes = [
-            'GET' => [],
-            'POST' => []
-        ];
-
-        // routes registered inside the callback pick up $this->prefix as they go
-        $callback($this);
-
-        $this->routes['GET'] = array_merge($originalRoutes['GET'], $this->routes['GET']);
-        $this->routes['POST'] = array_merge($originalRoutes['POST'], $this->routes['POST']);
-        $this->prefix = '';
-    }
-
-    public function routeAction(Request $request): RouteDTO {
-        $routeObject = new RouteDTO();
+    public function routeAction(Request $request): Route
+    {
         $routes = $this->routesFor($request->method);
+        $uri = $request->uri;
 
-        if(array_key_exists($request->uri, $routes)) {
-            $routeObject->action = $routes[$request->uri]['action'];
-            $routeObject->type = $routes[$request->uri]['type'];
-
-            return $routeObject;
+        if (array_key_exists($uri, $routes)) {
+            return Route::to($routes[$uri]['action'], $routes[$uri]['type']);
         }
 
-        foreach ($routes as $uri => $route) {
-            if ($route['type'] === 'dynamic') {
-                $parts = explode('/', $uri);
-                $requestParts = explode('/', $request->uri);
+        foreach ($routes as $pattern => $route) {
+            if ($route['type'] !== Route::TYPE_DYNAMIC) {
+                continue;
+            }
 
-                if (count($parts) !== count($requestParts)) {
-                    continue;
-                }
+            $params = $this->matchDynamic($pattern, $uri);
 
-                $params = [];
-                $isMatch = true;
-
-                foreach ($parts as $index => $part) {
-                    if (str_starts_with($part, '{') && str_ends_with($part, '}')) {
-                        $params[trim($part, '{}')] = $requestParts[$index];
-                    } elseif ($part !== $requestParts[$index]) {
-                        $isMatch = false;
-                        break;
-                    }
-                }
-
-                if ($isMatch) {
-                    $routeObject->action = $route['action'];
-                    $routeObject->type = 'dynamic';
-                    $routeObject->params = $params;
-
-                    // first match wins; without this the last registered route
-                    // silently overwrote every earlier one
-                    return $routeObject;
-                }
+            if ($params !== null) {
+                // first match wins; without returning here the last registered
+                // route silently overwrote every earlier one
+                return Route::to($route['action'], Route::TYPE_DYNAMIC, $params);
             }
         }
 
-        return $routeObject;
+        return Route::none();
+    }
+
+    /**
+     * @return array<string, string>|null the captured parameters, or null if the pattern does not match
+     */
+    private function matchDynamic(string $pattern, string $uri): ?array
+    {
+        $parts = explode('/', $pattern);
+        $requestParts = explode('/', $uri);
+
+        if (count($parts) !== count($requestParts)) {
+            return null;
+        }
+
+        $params = [];
+
+        foreach ($parts as $index => $part) {
+            if (str_starts_with($part, '{') && str_ends_with($part, '}')) {
+                $params[trim($part, '{}')] = $requestParts[$index];
+                continue;
+            }
+
+            if ($part !== $requestParts[$index]) {
+                return null;
+            }
+        }
+
+        return $params;
+    }
+
+    private function add(string $method, string $uri, string $action): void
+    {
+        $dynamic = $this->hasDynamicParts($uri);
+
+        if ($dynamic) {
+            // validates the segments and rejects '{}'. This used to happen as a
+            // side effect of computing a 'parts' key nothing ever read; the
+            // check is worth keeping, so it is done deliberately.
+            $this->handleDynamicParts($uri);
+        }
+
+        $this->routes[$method][$this->makeUri($uri)] = [
+            'action' => $action,
+            'type' => $dynamic ? Route::TYPE_DYNAMIC : Route::TYPE_STATIC,
+        ];
     }
 
     /**
      * Routes registered for a method.
      *
-     * Only GET and POST can be registered, so any other verb — HEAD from a link
-     * checker, OPTIONS from a CORS preflight — used to index a missing key and
-     * take the whole request down with a TypeError. HEAD is answered from the
-     * GET table because HTTP defines it as GET without a body.
+     * HEAD is answered from the GET table because HTTP defines it as GET
+     * without a body. An unregistered verb returns an empty table rather than
+     * indexing a missing key and taking the request down.
      *
-     * @return array<string, array<string, mixed>>
+     * @return array<string, array{action: string, type: string}>
      */
     private function routesFor(string $method): array
     {
@@ -170,5 +206,15 @@ class Router {
         }
 
         return $this->routes[$method] ?? [];
+    }
+
+    /**
+     * The verbs a route can be registered for.
+     *
+     * @return list<string>
+     */
+    public static function methods(): array
+    {
+        return self::METHODS;
     }
 }

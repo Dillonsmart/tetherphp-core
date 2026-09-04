@@ -19,7 +19,8 @@
     "autoload-dev": {
         "psr-4": {
             "TetherPHP\\Tests\\": "tests/",
-            "Commands\\": "tests/Fixtures/app/Commands/"
+            "Commands\\": "tests/Fixtures/app/Commands/",
+            "TetherPHP\\Tests\\Fixtures\\app\\Actions\\": "tests/Fixtures/app/Actions/"
         }
     },
     "require": {

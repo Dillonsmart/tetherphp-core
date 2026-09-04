@@ -80,7 +80,7 @@ What Phase 1 could not reach, and why:
 
 These three are the argument for Phase 2, not leftovers from Phase 1.
 
-## Phase 2 — One explicit pipeline · `v0.4.0`, breaking
+## Phase 2 — One explicit pipeline · `v0.4.0`, breaking — **done**
 
 Give the last stage of the pipeline a body, and make the Kernel have exactly one exit.
 
@@ -92,8 +92,9 @@ Give the last stage of the pipeline a body, and make the Kernel have exactly one
 - Resolve the two rendering paths. Recommended: keep `$router->view()` as sugar resolving to a framework-supplied
   Action, so there is one path through the pipeline and one way to write a static page.
 
-**Done when** every route — matched, unmatched or erroring — returns a `Response`, and the Request-to-Response path
-can be followed by reading `Kernel::run()` top to bottom.
+**Done.** Every route returns a `Response`; `Kernel::run()` reads top to bottom; the Kernel has tests for the first
+time. `Router` also gained `put`, `patch` and `delete`, which `Request` had been enforcing CSRF on all along without
+them being registerable.
 
 **Risk** Every existing Action's signature changes. The skeleton and the website update in lockstep with the release.
 

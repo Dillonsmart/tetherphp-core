@@ -36,6 +36,17 @@ class Request implements RequestInterface
         }
     }
 
+    /**
+     * Parameters captured from a dynamic route.
+     *
+     * The router captured these all along and the Kernel dropped them, so every
+     * application had to re-parse the URI inside its own Actions. They arrive
+     * with the request now.
+     *
+     * @var array<string, string>
+     */
+    public array $params = [];
+
     public float|string $startTime;
 
     // null until a CsrfToken has been generated for the session

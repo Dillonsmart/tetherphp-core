@@ -33,7 +33,7 @@ class RouterTest extends TestCase
         $this->router->get('/about', 'Actions\About');
 
         $this->assertSame(
-            ['action' => 'Actions\About', 'type' => 'static', 'parts' => []],
+            ['action' => 'Actions\About', 'type' => 'static'],
             $this->router->routes['GET']['/about']
         );
     }
@@ -61,10 +61,8 @@ class RouterTest extends TestCase
     {
         $this->router->get('/docs/{page}', 'Actions\Docs');
 
-        $route = $this->router->routes['GET']['/docs/{page}'];
-
-        $this->assertSame('dynamic', $route['type']);
-        $this->assertSame(['page'], $route['parts']);
+        $this->assertSame('dynamic', $this->router->routes['GET']['/docs/{page}']['type']);
+        $this->assertSame(['page'], $this->router->handleDynamicParts('/docs/{page}'));
     }
 
     public function testRejectsAnEmptyDynamicSegment(): void
@@ -153,7 +151,7 @@ class RouterTest extends TestCase
 
         $route = $this->router->routeAction($this->request('GET', '/nope'));
 
-        $this->assertFalse(isset($route->action));
+        $this->assertFalse($route->matched);
     }
 
     public function testDoesNotMatchADynamicRouteWithADifferentSegmentCount(): void
@@ -162,7 +160,7 @@ class RouterTest extends TestCase
 
         $route = $this->router->routeAction($this->request('GET', '/docs/routing/extra'));
 
-        $this->assertFalse(isset($route->action));
+        $this->assertFalse($route->matched);
     }
 
     public function testDoesNotMatchARouteRegisteredForAnotherMethod(): void
@@ -171,6 +169,6 @@ class RouterTest extends TestCase
 
         $route = $this->router->routeAction($this->request('GET', '/contact'));
 
-        $this->assertFalse(isset($route->action));
+        $this->assertFalse($route->matched);
     }
 }

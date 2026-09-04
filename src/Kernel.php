@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 namespace TetherPHP;
 
+use TetherPHP\framework\Http\Response;
+use TetherPHP\framework\Interfaces\ActionInterface;
 use TetherPHP\framework\Modules\Env;
 use TetherPHP\framework\Modules\Log;
 use TetherPHP\framework\Requests\Request;
+use TetherPHP\framework\Routing\Route;
 use TetherPHP\framework\Sessions\CsrfToken;
 use TetherPHP\framework\Sessions\Session;
 
 class Kernel
 {
-
     protected Request $request;
 
-    protected string $versionName = "0.1 alpha";
+    protected string $versionName = "0.4 alpha";
 
-    protected float $versionNumber = 0.1;
+    protected float $versionNumber = 0.4;
 
     protected Session $session;
 
@@ -44,11 +46,13 @@ class Kernel
     }
 
     /**
-     * @return string the response body
+     * Resolves the request to a response.
      *
-     * @throws \Exception
+     * Every path through this method returns a Response — a match, a miss, a
+     * rejected write, a misconfigured route. Nothing is echoed and nothing
+     * exits, which is what makes the whole pipeline testable.
      */
-    public function run()
+    public function run(): Response
     {
         try {
             $this->request = new Request(
@@ -58,64 +62,96 @@ class Kernel
                 microtime(true),
             );
         } catch (\Exception $e) {
-            // A rejected write is a client error, not a server one. Uncaught, it
-            // reached the exception handler and was reported as a 500.
+            // A rejected write is a client error, not a server one.
             Log::error('Rejected request: ' . $e->getMessage());
 
-            return $this->errorView(403);
+            return $this->errorResponse(403);
         }
 
         $route = $this->router->routeAction($this->request);
 
-        if (!isset($route->action)) {
-            return $this->errorView(404);
+        if (!$route->matched) {
+            return $this->errorResponse(404);
         }
 
-        if ($route->type === 'view') {
-            ob_start();
-            include(views_dir() . str_replace('.', '/', $route->action) . '.php');
-            return ob_get_clean() ?: '';
+        $this->request->params = $route->params;
+        $this->request->payload = $this->payload();
+
+        if ($route->isView()) {
+            return Response::html($this->renderView($route->action));
         }
 
+        return $this->invoke($route);
+    }
+
+    private function invoke(Route $route): Response
+    {
         if (!class_exists($route->action)) {
             Log::error("Route points at {$route->action}, which does not exist.");
 
-            return $this->errorView(500);
+            return $this->errorResponse(500);
         }
 
-        // CONTENT_TYPE is absent on any request without a body, which is most of them
-        if (($_SERVER['CONTENT_TYPE'] ?? '') === 'application/json') {
-            $this->request->payload = json_decode(file_get_contents('php://input') ?: '', true) ?? [];
-        } else {
-            $this->request->payload = $_POST;
+        $action = new $route->action($this->request);
+
+        if (!$action instanceof ActionInterface) {
+            Log::error(sprintf(
+                '%s must implement %s to be routable.',
+                $route->action,
+                ActionInterface::class,
+            ));
+
+            return $this->errorResponse(500);
         }
 
-        $invokeAction = new $route->action($this->request);
-
-        if (!is_callable($invokeAction)) {
-            Log::error("Action {$route->action} is not invokable — it needs an __invoke() method.");
-
-            return $this->errorView(500);
-        }
-
-        return $invokeAction();
+        return $action();
     }
 
     /**
-     * Sets the status and returns the rendered error page.
-     *
-     * The application's own view wins; the framework ships fallbacks so an
-     * application that has not written one still gets a page rather than an
-     * empty body from a failed include. Previously these were echoed directly
-     * and '' was returned, so run() did not actually return the response it
-     * claims to.
+     * @return array<string, mixed>
      */
-    private function errorView(int $status): string
+    private function payload(): array
     {
-        if (!headers_sent()) {
-            http_response_code($status);
+        // CONTENT_TYPE is absent on any request without a body, which is most of them
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+
+        if (is_string($contentType) && str_contains($contentType, 'application/json')) {
+            $decoded = json_decode(file_get_contents('php://input') ?: '', true);
+
+            return is_array($decoded) ? $decoded : [];
         }
 
+        return $_POST;
+    }
+
+    private function renderView(string $view): string
+    {
+        $file = views_dir() . str_replace('.', '/', $view) . '.php';
+
+        if (!file_exists($file)) {
+            Log::error("View route points at {$view}, which does not exist.");
+
+            return $this->errorBody(500);
+        }
+
+        ob_start();
+        include $file;
+
+        return ob_get_clean() ?: '';
+    }
+
+    private function errorResponse(int $status): Response
+    {
+        return Response::html($this->errorBody($status), $status);
+    }
+
+    /**
+     * The application's error view wins; the framework ships fallbacks so an
+     * application that has not written one still gets a page rather than an
+     * empty body from a failed include.
+     */
+    private function errorBody(int $status): string
+    {
         $view = views_dir() . "errors/{$status}.php";
 
         if (!file_exists($view)) {
@@ -143,8 +179,7 @@ class Kernel
      * The path alone, without the query string.
      *
      * REQUEST_URI carries the query string, so routing on it raw meant any URL
-     * with parameters — pagination, a UTM tag, a filter — failed to match and
-     * returned a 404.
+     * with parameters — pagination, a UTM tag, a filter — failed to match.
      */
     private function requestPath(): string
     {
@@ -193,8 +228,8 @@ class Kernel
     }
 
     /**
-     * Renders the 500 page and stops. Guarded against re-entry so that an error
-     * inside the error view cannot recurse through the handler.
+     * Last resort for an error that escaped the pipeline. Guarded against
+     * re-entry so an error inside the error view cannot recurse.
      */
     private function renderFatalError(): never
     {
@@ -203,13 +238,7 @@ class Kernel
         if (!$rendering) {
             $rendering = true;
 
-            // exit() sets a process status, not an HTTP one — the response code has
-            // to be set explicitly or the error page is served as a 200
-            if (!headers_sent()) {
-                http_response_code(500);
-            }
-
-            include(views_dir() . 'errors/500.php');
+            $this->errorResponse(500)->send();
         }
 
         exit(1);
