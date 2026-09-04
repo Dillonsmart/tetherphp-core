@@ -3,7 +3,7 @@
 Taking the framework from working to compliant with its [six core principles](../AGENTS.md#the-six-core-principles).
 Ordered by dependency: Phases 2 and 3 are both breaking and ship together so consumers migrate once.
 
-Current: `v0.3.0`. Target: `v1.0`.
+Current: `v0.5.0`. Target: `v1.0`.
 
 Items struck through below have landed since this roadmap was written.
 
@@ -63,6 +63,11 @@ Nothing new. Stop the framework lying about what it does.
   session values reaching arithmetic untyped.
 - ~~An integration harness (a fixture application inside `tests/`)~~ **done** — `tests/Fixtures/app`, linked into
   place by the bootstrap, with a `tests/Feature` suite.
+
+**`v0.5.0` raises the floor to PHP 8.5**, which is what let `Kernel::restoreErrorHandlers()` exist: 8.5's
+`get_error_handler()` makes it possible to check the Kernel's own handler is still installed before removing it,
+rather than blindly calling `restore_error_handler()` and risking someone else's. The Kernel previously installed a
+pair per construction with no way to take them off.
 
 **Phase 1 is complete.** A follow-up review then found a further set of defects that neither the tests nor PHPStan
 could see, all fixed in `v0.3.4`: every non-GET/POST request returned 500; any URL with a query string 404'd; the

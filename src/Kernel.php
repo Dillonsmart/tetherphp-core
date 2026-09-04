@@ -17,11 +17,16 @@ class Kernel
 {
     protected Request $request;
 
-    protected string $versionName = "0.4 alpha";
+    protected string $versionName = "0.5 alpha";
 
-    protected float $versionNumber = 0.4;
+    protected float $versionNumber = 0.5;
 
     protected Session $session;
+
+    /** The handlers this Kernel installed, kept so they can be taken back off. */
+    private ?\Closure $errorHandler = null;
+
+    private ?\Closure $exceptionHandler = null;
 
     /**
      * @throws \Exception
@@ -194,6 +199,30 @@ class Kernel
         return is_string($path) && $path !== '' ? $path : '/';
     }
 
+    /**
+     * Puts back whatever error and exception handlers were in place before this
+     * Kernel installed its own.
+     *
+     * Installing handlers in the constructor and never offering a way out meant
+     * each Kernel left a pair behind — invisible in a web request that ends, a
+     * leak anywhere the process continues. PHP 8.5's get_error_handler() and
+     * get_exception_handler() make it checkable: only restore if ours is still
+     * the one on top, so a handler installed after this Kernel is not clobbered.
+     */
+    public function restoreErrorHandlers(): void
+    {
+        if ($this->errorHandler !== null && get_error_handler() === $this->errorHandler) {
+            restore_error_handler();
+        }
+
+        if ($this->exceptionHandler !== null && get_exception_handler() === $this->exceptionHandler) {
+            restore_exception_handler();
+        }
+
+        $this->errorHandler = null;
+        $this->exceptionHandler = null;
+    }
+
     private function setErrorHandler(): void
     {
         if (env('APP_DEBUG') === 'true') {
@@ -204,7 +233,7 @@ class Kernel
             ini_set('display_errors', '0');
         }
 
-        set_error_handler(function ($errno, $errstr, $errfile, $errline) {
+        $this->errorHandler = function ($errno, $errstr, $errfile, $errline) {
             Log::error("Error [$errno]: $errstr in $errfile on line $errline");
 
             // Notices, warnings and deprecations are logged, not fatal. Replacing
@@ -217,14 +246,17 @@ class Kernel
             }
 
             $this->renderFatalError();
-        });
+        };
 
-        set_exception_handler(function ($exception) {
+        $this->exceptionHandler = function ($exception) {
             Log::error("Uncaught Exception: " . $exception->getMessage());
             Log::error("Uncaught Exception: " . $exception->getTraceAsString());
 
             $this->renderFatalError();
-        });
+        };
+
+        set_error_handler($this->errorHandler);
+        set_exception_handler($this->exceptionHandler);
     }
 
     /**

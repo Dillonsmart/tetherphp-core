@@ -8,7 +8,7 @@ it as a Composer dependency; framework changes are made here, not there.
 
 ## Requirements
 
-- PHP 8.4 or higher (property hooks and `new` without parentheses are used throughout)
+- PHP 8.5 or higher (property hooks and `new` without parentheses are used throughout)
 - Composer 2
 
 ## Installation

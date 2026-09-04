@@ -64,14 +64,18 @@ do not omit it from a new file — and be aware it is why `logger($e, 'error')` 
 `logger($e->getMessage(), 'error')`: an `Exception` was being coerced to a string via `__toString()`, dragging a
 stack trace into the log.
 
-`>=8.4`, and the code genuinely depends on it:
+`>=8.5`, and the code genuinely depends on the version floor:
 
 - **Property hooks** — `Request::$method` and `$uri` normalise via `set` hooks (`$uri` is lowercased, so route
   matching is case-insensitive and captured dynamic params arrive lowercased).
 - **Interface property declarations** — `RequestInterface` declares `public string $method {set; get;}`.
 - **`new` without parentheses** — e.g. `new Console($command)->executeCommand(...)`.
 
-Do not "simplify" these into pre-8.4 forms.
+- **`get_error_handler()` / `get_exception_handler()`** (8.5) — `Kernel::restoreErrorHandlers()` uses them to
+  check its own handler is still the one installed before taking it off, so it cannot clobber a handler someone
+  else added afterwards.
+
+Do not "simplify" these into older forms.
 
 ## Adding a console command
 

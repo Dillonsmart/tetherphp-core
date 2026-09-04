@@ -32,7 +32,7 @@ composer install
 composer test          # PHPUnit 11, suite in tests/Unit
 ```
 
-Requires **PHP >= 8.4**. Property hooks, interface property declarations and parenthesis-free `new` are used
+Requires **PHP >= 8.5**. Property hooks, interface property declarations and parenthesis-free `new` are used
 throughout and are load-bearing — do not rewrite them into pre-8.4 forms.
 
 ## Guides
@@ -41,7 +41,7 @@ Detailed working knowledge lives in `docs/agents/`. These are plain markdown and
 one before making changes:
 
 - [`docs/agents/principles.md`](docs/agents/principles.md) — the six principles in full, with a review checklist.
-- [`docs/agents/framework.md`](docs/agents/framework.md) — layout, the path-helper rule, PHP 8.4 features in use,
+- [`docs/agents/framework.md`](docs/agents/framework.md) — layout, the path-helper rule, PHP version features in use,
   adding console commands and stubs, what belongs here versus in the skeleton.
 - [`docs/agents/releasing.md`](docs/agents/releasing.md) — tagging, pre-1.0 version semantics, and coordinating the
   skeleton's version constraint.

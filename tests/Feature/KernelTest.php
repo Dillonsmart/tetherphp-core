@@ -30,16 +30,26 @@ class KernelTest extends TestCase
         $this->router = new Router();
     }
 
-    /**
-     * Kernel::setErrorHandler() installs global handlers and offers no way to
-     * remove them, so each construction leaves a pair behind. Worth fixing in
-     * the framework; until then the tests put the stack back themselves.
-     */
+    /** @var list<Kernel> */
+    private array $kernels = [];
+
     protected function tearDown(): void
     {
-        // one pair per Kernel constructed, and each test constructs exactly one
-        restore_error_handler();
-        restore_exception_handler();
+        // the framework takes its own handlers back off now, rather than the
+        // tests papering over a leak
+        foreach ($this->kernels as $kernel) {
+            $kernel->restoreErrorHandlers();
+        }
+
+        $this->kernels = [];
+    }
+
+    private function kernel(): Kernel
+    {
+        $kernel = new Kernel($this->router);
+        $this->kernels[] = $kernel;
+
+        return $kernel;
     }
 
     private function get(string $uri): Response
@@ -47,7 +57,7 @@ class KernelTest extends TestCase
         $_SERVER['REQUEST_METHOD'] = 'GET';
         $_SERVER['REQUEST_URI'] = $uri;
 
-        return (new Kernel($this->router))->run();
+        return $this->kernel()->run();
     }
 
     public function testAMatchedRouteReturnsTheActionsResponse(): void
@@ -113,7 +123,7 @@ class KernelTest extends TestCase
         $_SERVER['REQUEST_URI'] = '/save';
         $_POST = [];
 
-        $response = (new Kernel($this->router))->run();
+        $response = $this->kernel()->run();
 
         $this->assertSame(403, $response->status());
     }
@@ -125,7 +135,43 @@ class KernelTest extends TestCase
         $_SERVER['REQUEST_METHOD'] = 'OPTIONS';
         $_SERVER['REQUEST_URI'] = '/';
 
-        $this->assertSame(404, (new Kernel($this->router))->run()->status());
+        $this->assertSame(404, $this->kernel()->run()->status());
+    }
+
+    /**
+     * The Kernel used to install handlers with no way to remove them, so every
+     * construction leaked a pair. PHP 8.5's get_error_handler() makes the
+     * removal checkable.
+     */
+    public function testItTakesItsOwnErrorHandlersBackOff(): void
+    {
+        $before = get_error_handler();
+
+        $kernel = new Kernel($this->router);
+        $this->assertNotSame($before, get_error_handler(), 'the Kernel should install its handler');
+
+        $kernel->restoreErrorHandlers();
+        $this->assertSame($before, get_error_handler(), 'and put the previous one back');
+    }
+
+    /**
+     * If something else installed a handler after the Kernel did, restoring
+     * must not pull that one off the stack.
+     */
+    public function testItDoesNotRemoveAHandlerInstalledAfterIt(): void
+    {
+        $kernel = new Kernel($this->router);
+
+        $mine = static fn (): bool => true;
+        set_error_handler($mine);
+
+        $kernel->restoreErrorHandlers();
+
+        $this->assertSame($mine, get_error_handler());
+
+        restore_error_handler();
+        restore_error_handler();
+        restore_exception_handler();
     }
 
     public function testHeadIsServedFromTheGetTable(): void
@@ -135,6 +181,6 @@ class KernelTest extends TestCase
         $_SERVER['REQUEST_METHOD'] = 'HEAD';
         $_SERVER['REQUEST_URI'] = '/greet';
 
-        $this->assertSame(200, (new Kernel($this->router))->run()->status());
+        $this->assertSame(200, $this->kernel()->run()->status());
     }
 }
