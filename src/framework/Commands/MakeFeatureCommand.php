@@ -39,6 +39,12 @@ class MakeFeatureCommand extends Command
             return $actionResult;
         }
 
+        // the Domain's return type names this class, so it has to exist first
+        $resultResult = $this->createResult();
+        if ($resultResult !== self::COMMAND_SUCCESS) {
+            return $resultResult;
+        }
+
         $domainResult = $this->createDomain();
         if ($domainResult !== self::COMMAND_SUCCESS) {
             return $domainResult;
@@ -76,6 +82,36 @@ class MakeFeatureCommand extends Command
         }
 
         $this->success("Action created successfully: {$actionFilePath}\n");
+        return self::COMMAND_SUCCESS;
+    }
+
+    /**
+     * The value object the Domain returns. It lives in its own directory
+     * because a feature can grow more than one — a list result and a single
+     * result are different types, not one array with a flag in it.
+     */
+    private function createResult(): int
+    {
+        $resultDir = app_dir() . '/Domains/Results';
+
+        if (!is_dir($resultDir) && !mkdir($resultDir, 0755, true) && !is_dir($resultDir)) {
+            $this->error("Failed to create directory: {$resultDir}\n");
+            return self::COMMAND_ERROR;
+        }
+
+        $resultFilePath = $resultDir . "/{$this->className}.php";
+
+        if (file_exists($resultFilePath)) {
+            $this->error("Class already exists: {$resultFilePath}\n");
+            return self::COMMAND_ERROR;
+        }
+
+        if (file_put_contents($resultFilePath, $this->generateTemplate('/Stubs/Result.txt')) === false) {
+            $this->error("Failed to create class: {$resultFilePath}\n");
+            return self::COMMAND_ERROR;
+        }
+
+        $this->success("Result created successfully: {$resultFilePath}\n");
         return self::COMMAND_SUCCESS;
     }
 

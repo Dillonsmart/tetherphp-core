@@ -25,7 +25,7 @@ src/
     ├── Http/           # Response
     ├── Routing/        # Route
     ├── Helpers/        # GlobalFunctions.php (Composer `files`), Route
-    ├── Interfaces/     # ActionInterface, RequestInterface, ResponderInterface
+    ├── Interfaces/     # ActionInterface, DomainResult, RequestInterface, ResponderInterface
     ├── Modules/        # Console, Env, Log
     ├── Requests/       # Request
     ├── Sessions/       # Session, CsrfToken
@@ -102,6 +102,9 @@ skeleton's `composer.json`.
 | `{{commandName}}` | `MakeCommand`                 | `Command.txt` |
 | `{{viewName}}`    | `MakeFeatureCommand`          | `Responder.txt`, `View.txt` |
 
+`make:feature` renders five of them in one run — `Action.txt`, `Result.txt`, `Domain.txt`, `Responder.txt` and
+`View.txt` — and the Result must be written before the Domain, because the Domain's return type names it.
+
 A placeholder no generator substitutes is emitted literally into the developer's file, so the set is a contract —
 `tests/Unit/StubsTest.php` enforces it. Adding one means updating the stub, the command that renders it, and that test.
 
@@ -133,6 +136,32 @@ Request → Route → Action → Domain → Responder → Response
 - **Route parameters arrive on the request** as `$request->params`. The router
   always captured them and the Kernel dropped them, so applications re-parsed
   the URI inside their own Actions.
+- **Domains return a `DomainResult`, never an array.** See below — this is the
+  one part of the pipeline the framework constrains by type without owning any
+  of the classes involved.
+
+## Why `DomainResult` exists
+
+`Domain::handle()` returned `array<string, mixed>`. The Responder passed that array to `view()`, which hands it to
+`extract()`, so its **keys were the template's variable names**. Renaming `$tagline` in a view meant editing a
+business-logic class — precisely the coupling the Responder sits in the pipeline to absorb, and the reason the
+Responder had become a pass-through with a name.
+
+`framework/Interfaces/DomainResult.php` is an empty marker. It declares nothing because it has nothing to say about
+what a result holds; its job is to give `Domain::handle()` and `Action::respond()` a type that is neither `array`
+nor `object`, so the pipeline can be read.
+
+The rules that follow from it, enforced by `tests/Unit/StubsTest.php` rather than by the framework at runtime:
+
+- a result is a `final readonly` value object under `Domains\Results\`, named and shaped in the **domain's** terms
+- the **Responder** builds the array the view extracts. It is the only place a view variable may be named
+- a feature with more than one outcome gets more than one result type. A list result and a single result are
+  different classes, not one array with a `found` flag in it — the Responder can then `match` on the type and pick
+  the view *and* the status code
+
+The framework cannot enforce any of this: `Actions\`, `Domains\` and `Responders\` are application namespaces, and
+the framework must not depend on them. It ships the interface, the stubs and the tests that hold the stubs to the
+contract; the skeleton demonstrates it.
 
 ## Request handling invariants
 

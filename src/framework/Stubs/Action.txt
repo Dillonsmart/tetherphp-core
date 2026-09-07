@@ -20,8 +20,8 @@ class {{className}} extends Action implements ActionInterface
 
     public function __invoke(): Response
     {
-        $data = $this->domain->handle();
+        $result = $this->domain->handle();
 
-        return $this->respond($data);
+        return $this->respond($result);
     }
 }

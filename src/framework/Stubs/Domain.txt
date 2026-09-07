@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Domains;
 
+use Domains\Results\{{className}} as {{className}}Result;
+
 class {{className}} extends Domain
 {
-    /**
-     * @return array<string, mixed>
-     */
-    public function handle(): array
+    public function handle(): {{className}}Result
     {
-        return [];
+        return new {{className}}Result('{{className}}');
     }
 }

@@ -1,6 +1,11 @@
-<h1>{{className}}</h1>
+<h1><?php echo htmlspecialchars($title); ?></h1>
 
 <p>
     This view is <code>app/Views/pages/{{viewName}}/index.php</code>, rendered by
     the <code>{{className}}</code> responder.
+</p>
+
+<p>
+    <code>$title</code> is named by that responder, out of the
+    <code>Domains\Results\{{className}}</code> the domain returned.
 </p>

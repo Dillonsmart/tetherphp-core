@@ -13,7 +13,7 @@ class StubsTest extends TestCase
 
     public function testEveryStubIsReachableThroughCoreDir(): void
     {
-        foreach (['Action', 'Command', 'Domain', 'Responder', 'View'] as $stub) {
+        foreach (['Action', 'Command', 'Domain', 'Responder', 'Result', 'View'] as $stub) {
             $this->assertFileExists(core_dir() . "/Stubs/{$stub}.txt");
         }
     }
@@ -59,6 +59,42 @@ class StubsTest extends TestCase
     }
 
     /**
+     * Domains used to return array<string, mixed> straight into the Responder,
+     * which handed it to extract(). The array's keys were the view's variable
+     * names, so a template renamed a business-logic class's return shape.
+     */
+    public function testDomainStubReturnsAResultRatherThanAnArray(): void
+    {
+        $stub = $this->stub('Domain');
+
+        $this->assertStringContainsString('public function handle(): {{className}}Result', $stub);
+        $this->assertStringNotContainsString('): array', $stub);
+    }
+
+    public function testResultStubIsAValueObjectMarkedAsADomainResult(): void
+    {
+        $stub = $this->stub('Result');
+
+        $this->assertStringContainsString('namespace Domains\\Results;', $stub);
+        $this->assertStringContainsString('final readonly class {{className}} implements DomainResult', $stub);
+        $this->assertStringContainsString('use TetherPHP\\framework\\Interfaces\\DomainResult;', $stub);
+    }
+
+    /**
+     * The Responder is the only place a view's variables may be named. A stub
+     * that forwarded its argument to view() unchanged would put the template
+     * back in charge of the domain's shape.
+     */
+    public function testResponderStubTranslatesTheResultIntoViewData(): void
+    {
+        $stub = $this->stub('Responder');
+
+        $this->assertStringContainsString('__invoke({{className}}Result $result)', $stub);
+        $this->assertStringContainsString('\'title\' => $result->title,', $stub);
+        $this->assertDoesNotMatchRegularExpression('/view\([^)]*,\s*\$result\s*[,)]/', $stub);
+    }
+
+    /**
      * A placeholder no generator substitutes would be emitted literally into the
      * developer's file, so the set of placeholders is part of the contract.
      */
@@ -66,7 +102,7 @@ class StubsTest extends TestCase
     {
         $known = ['{{className}}', '{{commandName}}', '{{viewName}}'];
 
-        foreach (['Action', 'Command', 'Domain', 'Responder', 'View'] as $stub) {
+        foreach (['Action', 'Command', 'Domain', 'Responder', 'Result', 'View'] as $stub) {
             preg_match_all('/\{\{[a-zA-Z]+\}\}/', $this->stub($stub), $matches);
 
             foreach (array_unique($matches[0]) as $placeholder) {
