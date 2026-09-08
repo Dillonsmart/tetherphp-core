@@ -42,7 +42,7 @@ one before making changes:
 
 - [`docs/agents/principles.md`](docs/agents/principles.md) — the six principles in full, with a review checklist.
 - [`docs/agents/framework.md`](docs/agents/framework.md) — layout, the path-helper rule, PHP version features in use,
-  adding console commands and stubs, what belongs here versus in the skeleton.
+  adding console commands, the `bin/tether` binary, and stubs; what belongs here versus in the skeleton.
 - [`docs/agents/releasing.md`](docs/agents/releasing.md) — tagging, pre-1.0 version semantics, and coordinating the
   skeleton's version constraint.
 
@@ -58,6 +58,7 @@ fails once the package is installed under `vendor/` — `tests/Unit/GlobalFuncti
 | Change                                                       | Repository       |
 | ------------------------------------------------------------ | ---------------- |
 | Routing, request, session, CSRF, logging, env, console, stubs  | here             |
+| The console binary (`bin/tether`) and how it boots             | here             |
 | Fallback error views (`src/framework/Views/errors/`)           | here             |
 | Actions, Domains, Responders, views, routes, assets            | `tetherphp`      |
 

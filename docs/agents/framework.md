@@ -17,6 +17,7 @@ decide a framework change: **Small & Composable** (could this be a package inste
 ## Layout
 
 ```
+bin/tether              # the console binary, declared as Composer `bin`
 src/
 ├── Kernel.php          # boot: env, session, CSRF, error handlers, dispatch
 ├── Router.php          # registration, groups, static + dynamic matching
@@ -92,6 +93,32 @@ Do not "simplify" these into older forms.
 
 Applications get their own commands from `app/Commands/` under the `Commands\` namespace; that mapping lives in the
 skeleton's `composer.json`.
+
+## The console binary
+
+`bin/tether` is the entry point, declared as `"bin": ["bin/tether"]` in this package's `composer.json`. Composer
+writes a proxy to the consuming application's `vendor/bin/tether` on install, and the skeleton's root `tether` file
+is a shim that forwards to that proxy. So the console bootstrap lives here, once, and no generated application
+carries a copy of it that can drift.
+
+It finds the autoloader through `$_composer_autoload_path`, which Composer's proxy sets:
+
+```php
+$autoload = $_composer_autoload_path ?? __DIR__ . '/../vendor/autoload.php';
+```
+
+The fallback covers running `bin/tether` from a standalone checkout of this repository, where there is no proxy and
+no parent `vendor/`. Do not replace it with a fixed relative path — the correct `vendor/` is the *application's*, not
+this package's, and only the proxy knows where that is.
+
+Two things follow:
+
+- Changing how the console boots — argument parsing, the autoloader lookup, the exit code — is a change here, not in
+  the skeleton.
+- **Adding or removing the `bin` declaration is a consumer-visible change.** Composer only writes `vendor/bin/`
+  proxies at install time, so an application resolving an older release gets no `vendor/bin/tether` and its shim
+  fails. A release that changes the declaration needs the skeleton's constraint bumped past it — see
+  `docs/agents/releasing.md`.
 
 ## Stubs
 

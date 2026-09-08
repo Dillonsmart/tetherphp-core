@@ -46,6 +46,8 @@ happily resolve the broken `0.3.0`. Delete the bad version from the Packagist UI
 Composer treats `^0.Y.Z` as locked to the `0.Y` series, so **the minor number is the breaking-change signal**: `^0.3`
 will not accept `0.4.0`. Bump the minor for anything a consumer can trip over:
 
+- adding or removing a `bin` entry: Composer writes `vendor/bin/` proxies only at install time, so an application
+  on an older release has no proxy for a binary added later
 - moving or renaming anything under `src/` that changes the PSR-4 path of a public class
 - changing the autoload roots in `composer.json`
 - changing what a path helper resolves to
