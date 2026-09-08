@@ -1,0 +1,26 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use TetherPHP\framework\Modules\Console;
+
+// Composer 2.2+ sets this in the vendor/bin proxy. The fallback covers a
+// standalone checkout of core, where there is no proxy and no parent vendor.
+$autoload = $_composer_autoload_path ?? __DIR__ . '/../vendor/autoload.php';
+
+if (!is_file($autoload)) {
+    fwrite(STDERR, "Composer autoloader not found. Run composer install.\n");
+    exit(1);
+}
+
+require_once $autoload;
+
+$args = array_slice($argv, 1);
+
+if ($args === []) {
+    echo "No arguments provided.\n";
+    exit(1);
+}
+
+exit(new Console($args[0])->executeCommand(array_slice($args, 1), []));

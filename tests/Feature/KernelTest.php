@@ -97,6 +97,52 @@ class KernelTest extends TestCase
         $this->assertStringContainsString('404', $response->body());
     }
 
+    /**
+     * An Action ends a request early by throwing — the Kernel turns the
+     * exception into the error Response rather than the Action building one.
+     */
+    public function testAnActionCanThrowItsOwn404(): void
+    {
+        $this->router->get('/users/{id}', \TetherPHP\Tests\Fixtures\app\Actions\ThrowsNotFound::class);
+
+        $this->assertSame(404, $this->get('/users/99')->status());
+    }
+
+    /**
+     * Applications subclass HttpException for their own statuses; the headers
+     * the exception carries must land on the response.
+     */
+    public function testAnApplicationHttpExceptionCarriesItsStatusAndHeaders(): void
+    {
+        $this->router->get('/brew', \TetherPHP\Tests\Fixtures\app\Actions\Brew::class);
+
+        $response = $this->get('/brew');
+
+        $this->assertSame(418, $response->status());
+        $this->assertSame('tea', $response->headers()['X-Beverage']);
+    }
+
+    public function testACrashBecomesA500WithoutLeakingTheMessage(): void
+    {
+        $this->router->get('/crash', \TetherPHP\Tests\Fixtures\app\Actions\Crashes::class);
+
+        $response = $this->get('/crash');
+
+        $this->assertSame(500, $response->status());
+        $this->assertStringNotContainsString('hunter2', $response->body());
+    }
+
+    /**
+     * A view route pointing at a missing view used to return the 500 error
+     * page with a 200 status — the body said one thing, the status another.
+     */
+    public function testAMissingViewIsA500NotA200(): void
+    {
+        $this->router->view('/ghost', 'pages.does-not-exist');
+
+        $this->assertSame(500, $this->get('/ghost')->status());
+    }
+
     public function testAMissingActionClassReturns500(): void
     {
         $this->router->get('/broken', 'Actions\DoesNotExist');
@@ -126,6 +172,24 @@ class KernelTest extends TestCase
         $response = $this->kernel()->run();
 
         $this->assertSame(403, $response->status());
+    }
+
+    /**
+     * The fixture app ships no errors/403.php, so the framework fallback
+     * renders — with the exception's title and description in scope.
+     */
+    public function testTheForbiddenPageRendersTheExceptionTitleAndDescription(): void
+    {
+        $this->router->post('/save', \TetherPHP\Tests\Fixtures\app\Actions\Greet::class);
+
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_SERVER['REQUEST_URI'] = '/save';
+        $_POST = [];
+
+        $response = $this->kernel()->run();
+
+        $this->assertStringContainsString('403 Forbidden', $response->body());
+        $this->assertStringContainsString('You are not allowed to access this resource.', $response->body());
     }
 
     public function testAnUnregisteredMethodReturns404RatherThanCrashing(): void
