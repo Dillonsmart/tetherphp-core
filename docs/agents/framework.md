@@ -22,6 +22,7 @@ src/
 ├── Router.php          # registration, groups, static + dynamic matching
 └── framework/
     ├── Commands/       # built-in console commands
+    ├── Exceptions/     # HttpException and its status subclasses
     ├── Http/           # Response
     ├── Routing/        # Route
     ├── Helpers/        # GlobalFunctions.php (Composer `files`), Route
@@ -170,10 +171,16 @@ contract; the skeleton demonstrates it.
 - **Never index `$routes[$method]` directly.** Only GET and POST can be registered, so any other verb used to hit a
   missing key and take the request down with a TypeError. `Router::routesFor()` is the only accessor; it defaults to
   an empty table and answers HEAD from the GET one.
+- **Errors end a request by throwing an `HttpException`.** `Kernel::run()` is the only catch: an `HttpException`
+  becomes an error Response carrying its status, title, description and any headers it declares; any other
+  `Throwable` is logged and becomes a 500. A route miss throws `HttpNotFoundException`, a rejected write
+  `HttpForbiddenException`, a misconfigured route `HttpInternalServerErrorException`. The framework ships those
+  three; applications subclass `HttpException` for their own statuses.
 - **Error pages go through `Kernel::errorResponse()`**, which prefers the application's `app/Views/errors/{status}.php`
-  and falls back to the framework's own. It returns the body rather than echoing it, so `run()` returns what it says
-  it returns.
-- **A rejected write is a 403, not a 500.** CSRF failures are caught in `run()`.
+  and falls back to the framework's own. The view is included with `$status`, `$title` and `$description` in scope.
+  It returns the body rather than echoing it, so `run()` returns what it says it returns.
+- **A rejected write is a 403, not a 500.** CSRF failures surface as `HttpForbiddenException`; the underlying
+  message goes to the log, not to the visitor.
 - **The CSRF token is read from `$_POST` or the `X-CSRF-Token` header.** PHP only populates `$_POST` for POST
   bodies, so header support is what makes PUT, PATCH and DELETE authorisable at all.
 

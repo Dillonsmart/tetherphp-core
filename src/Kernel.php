@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace TetherPHP;
 
+use TetherPHP\framework\Exceptions\HttpException;
+use TetherPHP\framework\Exceptions\HttpForbiddenException;
+use TetherPHP\framework\Exceptions\HttpInternalServerErrorException;
+use TetherPHP\framework\Exceptions\HttpNotFoundException;
 use TetherPHP\framework\Http\Response;
 use TetherPHP\framework\Interfaces\ActionInterface;
 use TetherPHP\framework\Modules\Env;
@@ -54,10 +58,35 @@ class Kernel
      * Resolves the request to a response.
      *
      * Every path through this method returns a Response — a match, a miss, a
-     * rejected write, a misconfigured route. Nothing is echoed and nothing
-     * exits, which is what makes the whole pipeline testable.
+     * rejected write, a misconfigured route. Error paths throw inside
+     * handle() and are turned back into Responses here, so ending a request
+     * early has one obvious way: throw an HttpException. Nothing is echoed
+     * and nothing exits, which is what makes the whole pipeline testable.
      */
     public function run(): Response
+    {
+        try {
+            return $this->handle();
+        } catch (HttpException $e) {
+            return $this->exceptionResponse($e);
+        } catch (\Throwable $e) {
+            Log::error('Uncaught: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
+
+            return $this->exceptionResponse(new HttpInternalServerErrorException());
+        }
+    }
+
+    /**
+     * The pipeline proper: Request → Route → Action → Response.
+     *
+     * Anything that goes wrong on the way throws — an HttpException for the
+     * errors that are part of the HTTP conversation, anything else for bugs.
+     * run() is the only place either is caught.
+     *
+     * @throws HttpException
+     */
+    private function handle(): Response
     {
         try {
             $this->request = new Request(
@@ -70,13 +99,13 @@ class Kernel
             // A rejected write is a client error, not a server one.
             Log::error('Rejected request: ' . $e->getMessage());
 
-            return $this->errorResponse(403);
+            throw new HttpForbiddenException();
         }
 
         $route = $this->router->routeAction($this->request);
 
         if (!$route->matched) {
-            return $this->errorResponse(404);
+            throw new HttpNotFoundException();
         }
 
         $this->request->params = $route->params;
@@ -89,12 +118,26 @@ class Kernel
         return $this->invoke($route);
     }
 
+    private function exceptionResponse(HttpException $e): Response
+    {
+        $response = $this->errorResponse($e->status(), $e->title(), $e->description());
+
+        foreach ($e->headers() as $name => $value) {
+            $response = $response->withHeader($name, $value);
+        }
+
+        return $response;
+    }
+
+    /**
+     * @throws HttpInternalServerErrorException when the route is misconfigured
+     */
     private function invoke(Route $route): Response
     {
         if (!class_exists($route->action)) {
             Log::error("Route points at {$route->action}, which does not exist.");
 
-            return $this->errorResponse(500);
+            throw new HttpInternalServerErrorException('The route points at an action that does not exist.');
         }
 
         $action = new $route->action($this->request);
@@ -106,7 +149,7 @@ class Kernel
                 ActionInterface::class,
             ));
 
-            return $this->errorResponse(500);
+            throw new HttpInternalServerErrorException('The route points at an action that is not routable.');
         }
 
         return $action();
@@ -129,6 +172,9 @@ class Kernel
         return $_POST;
     }
 
+    /**
+     * @throws HttpInternalServerErrorException when the view route is misconfigured
+     */
     private function renderView(string $view): string
     {
         $file = views_dir() . str_replace('.', '/', $view) . '.php';
@@ -136,7 +182,7 @@ class Kernel
         if (!file_exists($file)) {
             Log::error("View route points at {$view}, which does not exist.");
 
-            return $this->errorBody(500);
+            throw new HttpInternalServerErrorException('The route points at a view that does not exist.');
         }
 
         ob_start();
@@ -145,17 +191,21 @@ class Kernel
         return ob_get_clean() ?: '';
     }
 
-    private function errorResponse(int $status): Response
+    private function errorResponse(int $status, string $title = '', string $description = ''): Response
     {
-        return Response::html($this->errorBody($status), $status);
+        return Response::html($this->errorBody($status, $title, $description), $status);
     }
 
     /**
      * The application's error view wins; the framework ships fallbacks so an
      * application that has not written one still gets a page rather than an
      * empty body from a failed include.
+     *
+     * The view is included with $status, $title and $description in scope.
+     * The framework's fallbacks render all three; an application view may
+     * use as many of them as it likes.
      */
-    private function errorBody(int $status): string
+    private function errorBody(int $status, string $title = '', string $description = ''): string
     {
         $view = views_dir() . "errors/{$status}.php";
 

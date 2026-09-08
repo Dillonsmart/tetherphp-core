@@ -22,7 +22,7 @@ class HelpCommand extends Command
 
         foreach ($console->commands as $command) {
             $instance = new $command();
-            $this->info(" - {$instance->command} - {$instance->description}");
+            $this->info(" - {$instance->command} - \033[37m{$instance->description}\033[0m");
         }
 
         if ($console->skipped() !== []) {
