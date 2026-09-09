@@ -7,8 +7,6 @@ namespace TetherPHP\Tests\Feature;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use TetherPHP\framework\Requests\Request;
-use TetherPHP\framework\Sessions\CsrfToken;
-use TetherPHP\framework\Sessions\Session;
 use TetherPHP\Router;
 
 /**
@@ -20,15 +18,10 @@ class HttpMethodRoutingTest extends TestCase
 {
     private Router $router;
 
-    private Session $session;
-
     protected function setUp(): void
     {
         $_SESSION = [];
         $_POST = [];
-
-        $this->session = new Session();
-        new CsrfToken($this->session);
 
         $this->router = new Router();
         $this->router->get('/', 'Actions\Home');
@@ -36,7 +29,7 @@ class HttpMethodRoutingTest extends TestCase
 
     private function request(string $method, string $uri = '/'): Request
     {
-        return new Request($this->session, $method, $uri, microtime(true));
+        return new Request($method, $uri, microtime(true));
     }
 
     /** @return list<list<string>> */
@@ -48,8 +41,6 @@ class HttpMethodRoutingTest extends TestCase
     #[DataProvider('unregisteredMethodProvider')]
     public function testAnUnregisteredMethodResolvesToNoRouteRatherThanCrashing(string $method): void
     {
-        $_POST = ['csrf_token' => $this->session->get('csrf_token')];
-
         $route = $this->router->routeAction($this->request($method));
 
         $this->assertFalse($route->matched);

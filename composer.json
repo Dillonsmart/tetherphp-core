@@ -20,7 +20,8 @@
         "psr-4": {
             "TetherPHP\\Tests\\": "tests/",
             "Commands\\": "tests/Fixtures/app/Commands/",
-            "TetherPHP\\Tests\\Fixtures\\app\\Actions\\": "tests/Fixtures/app/Actions/"
+            "TetherPHP\\Tests\\Fixtures\\app\\Actions\\": "tests/Fixtures/app/Actions/",
+            "TetherPHP\\Tests\\Fixtures\\app\\Middleware\\": "tests/Fixtures/app/Middleware/"
         }
     },
     "require": {
@@ -44,5 +45,7 @@
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
-    "bin": ["bin/tether"]
+    "bin": [
+        "bin/tether"
+    ]
 }

@@ -4,28 +4,25 @@ namespace TetherPHP\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use TetherPHP\framework\Requests\Request;
-use TetherPHP\framework\Sessions\CsrfToken;
-use TetherPHP\framework\Sessions\Session;
 use TetherPHP\Router;
 
 class RouterTest extends TestCase
 {
     private Router $router;
 
-    private Session $session;
-
     protected function setUp(): void
     {
         $this->router = new Router();
-
-        $_SESSION = [];
-        $this->session = new Session();
-        new CsrfToken($this->session);
     }
 
+    /**
+     * Building one no longer starts a session or validates a token, so routing
+     * can be unit tested against a plain value — which is what a unit test in
+     * this repository is supposed to be able to do.
+     */
     private function request(string $method, string $uri): Request
     {
-        return new Request($this->session, $method, $uri, microtime(true));
+        return new Request($method, $uri, microtime(true));
     }
 
     public function testRegistersAGetRouteAsStatic(): void

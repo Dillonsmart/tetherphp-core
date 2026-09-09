@@ -19,14 +19,15 @@ decide a framework change: **Small & Composable** (could this be a package inste
 ```
 bin/tether              # the console binary, declared as Composer `bin`
 src/
-├── Kernel.php          # boot: session, CSRF, error handlers, dispatch
+├── Kernel.php          # boot: error handlers, middleware, dispatch
 ├── Router.php          # registration, groups, static + dynamic matching
 └── framework/
     ├── Commands/       # built-in console commands
     ├── Exceptions/     # HttpException and its status subclasses
     ├── Helpers/        # GlobalFunctions.php (Composer `files`), Route
     ├── Http/           # Response
-    ├── Interfaces/     # ActionInterface, DomainResult, RequestInterface, ResponderInterface
+    ├── Interfaces/     # ActionInterface, DomainResult, MiddlewareInterface, RequestInterface, ResponderInterface
+    ├── Middleware/      # VerifyCsrfToken
     ├── Modules/        # Console, Input, Env, Log
     ├── Requests/       # Request
     ├── Routing/        # Route (the result of matching)
@@ -223,8 +224,12 @@ calls `exit()`, which is what makes the Kernel testable at all; it had no
 coverage until this changed.
 
 ```
-Request → Route → Action → Domain → Responder → Response
+Request → [ Middleware → Route → Action → Domain → Responder → Response ] → Middleware
 ```
+
+Middleware **wraps** the pipeline rather than being a stage in it: the first in
+the list is the outermost, so it is the first to see a request and the last to
+see a response.
 
 - **`Response`** (`framework/Http`) is an immutable value: body, status, headers.
   `send()` is the only place the framework writes to the client.
@@ -240,6 +245,60 @@ Request → Route → Action → Domain → Responder → Response
 - **Domains return a `DomainResult`, never an array.** See below — this is the
   one part of the pipeline the framework constrains by type without owning any
   of the classes involved.
+
+## Middleware: the composition seam
+
+`MiddlewareInterface` is one method:
+
+```php
+public function __invoke(Request $request, \Closure $next): Response;
+```
+
+Call `$next($request)` to continue and you get the Response from the rest of the
+pipeline, to return, replace or add a header to. Return your own Response
+without calling it and nothing further runs. Throw an `HttpException` and the
+Kernel turns it into the error page, exactly as it does from an Action.
+
+The list is given to the Kernel; nothing is discovered. **The order middleware
+runs in is the order it is written in `public/index.php` and nowhere else.**
+
+Two decisions worth not relitigating:
+
+- **Why `$next` rather than a before-only guard returning `?Response`.** The
+  guard is easier to read and cannot touch the response on the way out, which
+  means a second concept the first time anything needs to — a security header,
+  a timing measurement. One shape covers both, and it is the shape PHP
+  developers and agents already recognise.
+- **Why the Kernel turns `HttpException` into a Response *inside* the
+  middleware.** If a 404 were thrown past them, middleware that adds something
+  on the way out would silently not apply to error pages, which is the one class
+  of response you least want to miss. `run()` still catches, for a middleware
+  that throws before calling `$next` and so has no inner pipeline to be caught
+  by.
+
+### What it made possible
+
+`Middleware\VerifyCsrfToken` is the first thing to use it, and the reason the
+seam was built before anything was extracted.
+
+CSRF used to be validated inside `Request::__construct()`. A Request took a
+Session, could throw, and every test that needed one needed a session — so the
+check could not be turned off, replaced, or applied to some routes and not
+others, and an API-only application got a session whether it wanted one or not.
+The Kernel constructed a `Session` and a `CsrfToken` on every request whether
+anything used them.
+
+Now an application composes it in, and one that leaves it out boots with no
+session and no CSRF check. `tests/Feature/CsrfProtectionTest.php` asserts both
+halves, including the application that opts out.
+
+**Known gap.** Middleware is declared in `public/index.php`, which the
+introspection commands deliberately do not load — they never construct
+application objects, and constructing this list would start a session from a
+terminal. So `tether routes` and `tether context` cannot yet show what runs
+around a request, which is a Principle 6 debt: moving the declaration somewhere
+loadable is a design decision, not a refactor, because loading it and
+constructing it are the same act.
 
 ## Why `DomainResult` exists
 
@@ -279,10 +338,12 @@ contract; the skeleton demonstrates it.
 - **Error pages go through `Kernel::errorResponse()`**, which prefers the application's `app/Views/errors/{status}.php`
   and falls back to the framework's own. The view is included with `$status`, `$title` and `$description` in scope.
   It returns the body rather than echoing it, so `run()` returns what it says it returns.
-- **A rejected write is a 403, not a 500.** CSRF failures surface as `HttpForbiddenException`; the underlying
-  message goes to the log, not to the visitor.
+- **A rejected write is a 403, not a 500.** `VerifyCsrfToken` throws `HttpForbiddenException`; the reason goes to
+  the log, not to the visitor.
 - **The CSRF token is read from `$_POST` or the `X-CSRF-Token` header.** PHP only populates `$_POST` for POST
   bodies, so header support is what makes PUT, PATCH and DELETE authorisable at all.
+- **Only POST, PUT, PATCH and DELETE are challenged**, named rather than inverted. "Anything that is not a GET"
+  would refuse an OPTIONS preflight with a 403 instead of letting it resolve to no route.
 
 ## Tests
 

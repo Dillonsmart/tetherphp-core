@@ -64,6 +64,20 @@ callers of `Env::current()` / `Log::current()`. A framework class reaching for `
 object through its constructor is a review failure. The global functions are a closed list of ten, documented with a
 reason each in [`docs/agents/framework.md`](docs/agents/framework.md#the-global-functions-are-a-closed-list).
 
+## Middleware is how anything composes in
+
+`Kernel::__construct(Router $router, Env $env, Log $log, array $middleware = [])`. A middleware is one method —
+`__invoke(Request $request, \Closure $next): Response` — and the list is given, never discovered, so the order things
+run in is the order they are written in the application's `public/index.php`.
+
+The framework starts **no session** and checks **no CSRF token** on its own. Both used to be welded into the Kernel
+constructor, and CSRF was validated inside `Request::__construct()`; an application composes
+`Middleware\VerifyCsrfToken` in if it wants them. This is the seam Principle 5 depends on — before it existed there
+was nowhere for a package to attach, so "extra functionality composes in as packages" was not true of anything.
+
+See [`docs/agents/framework.md`](docs/agents/framework.md#middleware-the-composition-seam) for the two design
+decisions behind it and the known tooling gap.
+
 ## Where a change belongs
 
 | Change                                                       | Repository       |

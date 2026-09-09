@@ -5,8 +5,20 @@ declare(strict_types=1);
 namespace TetherPHP\framework\Requests;
 
 use TetherPHP\framework\Interfaces\RequestInterface;
-use TetherPHP\framework\Sessions\Session;
 
+/**
+ * What was asked for.
+ *
+ * A Request used to take a Session and validate a CSRF token in its own
+ * constructor, so constructing one could throw, every test that needed a
+ * Request needed a session, and an API-only application got session-based CSRF
+ * whether it wanted it or not. Worse, it welded the framework's one security
+ * check to a class whose job is to describe a request — there was no way to
+ * turn it off, replace it, or apply it to only some routes.
+ *
+ * That check is now `Middleware\VerifyCsrfToken`, which an application composes
+ * in. This class describes the request and nothing else.
+ */
 class Request implements RequestInterface
 {
     public string $method {
@@ -49,50 +61,23 @@ class Request implements RequestInterface
 
     public float|string $startTime;
 
-    // null until a CsrfToken has been generated for the session
-    protected ?string $csrfToken = null;
-
-    /**
-     * @throws \Exception
-     */
-    public function __construct(Session $session, string $method = '', string $uri = '', float|string $startTime = '')
+    public function __construct(string $method = '', string $uri = '', float|string $startTime = '')
     {
         $this->method = $method;
         $this->uri = $uri;
         $this->startTime = $startTime ?: microtime(true);
-        $this->csrfToken = $session->get('csrf_token');
-
-        if(in_array(strtoupper($method), ['POST', 'PUT', 'PATCH', 'DELETE'])) {
-            $this->validateCsrfToken($this->submittedCsrfToken());
-        }
     }
 
     /**
-     * The token a write request presented, if any.
+     * Whether this request is one that changes something.
      *
-     * PHP only populates $_POST for POST bodies, so reading the token from
-     * there alone made PUT, PATCH and DELETE impossible to authorise — they
-     * could never present a token and so always failed validation. The header
-     * is how those methods, and fetch/XHR clients generally, send it.
+     * Named rather than inverted — "not GET and not HEAD" would also challenge
+     * OPTIONS, so a CORS preflight would be refused with a 403 instead of
+     * resolving to no route. Only these four can be registered as writes, and
+     * anything else 404s before reaching an Action.
      */
-    private function submittedCsrfToken(): ?string
+    public function isWrite(): bool
     {
-        $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
-
-        return is_string($token) ? $token : null;
-    }
-
-    /**
-     * A request with no token, or one made against a session that never had a
-     * token generated, is rejected the same way a mismatched token is — it must
-     * not be able to crash its way past validation.
-     *
-     * @throws \Exception
-     */
-    public function validateCsrfToken(?string $token): void
-    {
-        if ($this->csrfToken === null || $token === null || !hash_equals($this->csrfToken, $token)) {
-            throw new \Exception('Invalid CSRF token');
-        }
+        return in_array($this->method, ['POST', 'PUT', 'PATCH', 'DELETE'], true);
     }
 }

@@ -178,24 +178,12 @@ class KernelTest extends TestCase
         $this->assertSame(500, $this->get('/nope')->status());
     }
 
-    public function testAWriteWithoutACsrfTokenIsRejectedAsForbidden(): void
-    {
-        $this->router->post('/save', \TetherPHP\Tests\Fixtures\app\Actions\Greet::class);
-
-        $_SERVER['REQUEST_METHOD'] = 'POST';
-        $_SERVER['REQUEST_URI'] = '/save';
-        $_POST = [];
-
-        $response = $this->kernel()->run();
-
-        $this->assertSame(403, $response->status());
-    }
-
     /**
-     * The fixture app ships no errors/403.php, so the framework fallback
-     * renders — with the exception's title and description in scope.
+     * A Kernel with no middleware composed in does not challenge a write. CSRF
+     * protection moved to Middleware\VerifyCsrfToken; CsrfProtectionTest
+     * covers it, including the 403 body.
      */
-    public function testTheForbiddenPageRendersTheExceptionTitleAndDescription(): void
+    public function testAWriteIsNotChallengedWithoutTheCsrfMiddleware(): void
     {
         $this->router->post('/save', \TetherPHP\Tests\Fixtures\app\Actions\Greet::class);
 
@@ -203,10 +191,7 @@ class KernelTest extends TestCase
         $_SERVER['REQUEST_URI'] = '/save';
         $_POST = [];
 
-        $response = $this->kernel()->run();
-
-        $this->assertStringContainsString('403 Forbidden', $response->body());
-        $this->assertStringContainsString('You are not allowed to access this resource.', $response->body());
+        $this->assertSame(200, $this->kernel()->run()->status());
     }
 
     public function testAnUnregisteredMethodReturns404RatherThanCrashing(): void

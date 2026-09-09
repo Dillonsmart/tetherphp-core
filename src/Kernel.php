@@ -5,23 +5,19 @@ declare(strict_types=1);
 namespace TetherPHP;
 
 use TetherPHP\framework\Exceptions\HttpException;
-use TetherPHP\framework\Exceptions\HttpForbiddenException;
 use TetherPHP\framework\Exceptions\HttpInternalServerErrorException;
 use TetherPHP\framework\Exceptions\HttpNotFoundException;
 use TetherPHP\framework\Http\Response;
 use TetherPHP\framework\Interfaces\ActionInterface;
+use TetherPHP\framework\Interfaces\MiddlewareInterface;
 use TetherPHP\framework\Modules\Env;
 use TetherPHP\framework\Modules\Log;
 use TetherPHP\framework\Requests\Request;
 use TetherPHP\framework\Routing\Route;
-use TetherPHP\framework\Sessions\CsrfToken;
-use TetherPHP\framework\Sessions\Session;
 
 class Kernel
 {
     protected Request $request;
-
-    protected Session $session;
 
     /** The handlers this Kernel installed, kept so they can be taken back off. */
     private ?\Closure $errorHandler = null;
@@ -42,18 +38,30 @@ class Kernel
      * should not have to thread an object through to read a setting. Those two
      * functions are the only readers of `Env::current()` and `Log::current()`.
      *
+     * Middleware is the seam everything else composes onto. It arrives as a
+     * list rather than being discovered, so the order things run in is the
+     * order they are written in `public/index.php` and nowhere else.
+     *
+     * The Kernel used to construct a Session and a CsrfToken here whether or
+     * not anything used them, and a Request validated its own CSRF token. An
+     * application that wants either now composes `VerifyCsrfToken` in, and one
+     * that does not — a token-authenticated API — boots without a session at
+     * all, which was previously impossible.
+     *
+     * @param list<MiddlewareInterface> $middleware
+     *
      * @throws \Exception
      */
-    public function __construct(protected Router $router, protected Env $env, protected Log $log)
-    {
+    public function __construct(
+        protected Router $router,
+        protected Env $env,
+        protected Log $log,
+        protected array $middleware = [],
+    ) {
         Env::use($this->env);
         Log::use($this->log);
 
         $this->setErrorHandler();
-
-        $this->session = new Session();
-
-        new CsrfToken($this->session); // ensure CSRF token is generated
     }
 
     /**
@@ -80,38 +88,87 @@ class Kernel
     }
 
     /**
-     * The pipeline proper: Request → Route → Action → Response.
+     * The pipeline proper: Request → Middleware → Route → Action → Response.
      *
      * Anything that goes wrong on the way throws — an HttpException for the
      * errors that are part of the HTTP conversation, anything else for bugs.
-     * run() is the only place either is caught.
+     * run() is the only place either is caught, which is what lets a
+     * middleware throw an HttpException to refuse a request instead of
+     * building the error Response itself.
      *
      * @throws HttpException
      */
     private function handle(): Response
     {
-        try {
-            $this->request = new Request(
-                $this->session,
-                $this->requestMethod(),
-                $this->requestPath(),
-                microtime(true),
-            );
-        } catch (\Exception $e) {
-            // A rejected write is a client error, not a server one.
-            $this->log->error('Rejected request: ' . $e->getMessage());
+        $this->request = new Request(
+            $this->requestMethod(),
+            $this->requestPath(),
+            microtime(true),
+        );
 
-            throw new HttpForbiddenException();
+        return $this->through($this->respond(...))($this->request);
+    }
+
+    /**
+     * Routing and dispatch, with the HTTP errors already turned into Responses.
+     *
+     * The conversion happens *inside* the middleware rather than in run(), so
+     * a 404 comes back out through every layer as an ordinary Response. If it
+     * were thrown past them, middleware that adds something on the way out —
+     * a security header, a timing measurement — would silently not apply to
+     * error pages, which is the one class of response you least want to miss.
+     *
+     * run() still catches: a middleware that throws before calling $next has
+     * no inner pipeline to be caught by.
+     */
+    private function respond(Request $request): Response
+    {
+        try {
+            return $this->dispatch($request);
+        } catch (HttpException $e) {
+            return $this->exceptionResponse($e);
+        }
+    }
+
+    /**
+     * Wraps the dispatch in the middleware, outermost first.
+     *
+     * Built back to front so that the first middleware in the list is the
+     * outermost layer — the first to see a request and the last to see a
+     * response, which is the order anyone writing the list expects.
+     *
+     * @param \Closure(Request): Response $dispatch
+     *
+     * @return \Closure(Request): Response
+     */
+    private function through(\Closure $dispatch): \Closure
+    {
+        $next = $dispatch;
+
+        foreach (array_reverse($this->middleware) as $middleware) {
+            // both are captured by value here, so each layer keeps the one
+            // that was built before it rather than the final $next
+            $next = static fn (Request $request): Response => $middleware($request, $next);
         }
 
-        $route = $this->router->routeAction($this->request);
+        return $next;
+    }
+
+    /**
+     * Route and invoke: what runs once every middleware has called $next.
+     *
+     * @throws HttpException
+     */
+    private function dispatch(Request $request): Response
+    {
+        $route = $this->router->routeAction($request);
 
         if (!$route->matched) {
             throw new HttpNotFoundException();
         }
 
-        $this->request->params = $route->params;
-        $this->request->payload = $this->payload();
+        $request->params = $route->params;
+        $request->payload = $this->payload();
 
         if ($route->isView()) {
             return Response::html($this->renderView($route->action));

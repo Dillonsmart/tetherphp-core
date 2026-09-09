@@ -155,17 +155,38 @@ default and the way to ask for silence, so `tether help` printed every registrat
 defined `VERSION` and `VERSION_NAME` from two hand-maintained properties that nothing read and that still said
 "0.5 alpha" at v0.7.0; they are gone, and `context` asks Composer what is installed.
 
-## Phase 5 — Seams and packages · `v0.6.0`
+## Phase 5 — Seams and packages · `v0.9.0` — **in progress**
 
 Prove that "small core, composed beyond" is a real architecture.
 
-- Interfaces for the replaceable concerns — session storage, logging, view rendering — defined by what the Kernel
-  actually needs, not speculatively.
-- Extract one concern to prove the seam. Sessions and CSRF are the strongest candidate: self-contained, clearly
-  optional for an API-only application, currently welded into the Kernel constructor.
-- Document the package convention so the second extraction is mechanical.
+The plan was written as though the seam already existed. It did not: there was nowhere for an extracted concern to
+plug back in, so extracting one would have produced a package that could not be used. The seam came first.
+
+- ~~A seam to compose onto.~~ **done** — `MiddlewareInterface`, one method, given to the Kernel as a list. It wraps
+  routing as well as the Action, and the Kernel converts `HttpException` to a Response *inside* it, so middleware
+  that adds something on the way out applies to error pages too.
+- ~~Extract one concern to prove the seam.~~ **done** — CSRF. It was validated inside `Request::__construct()`,
+  which took a `Session` and could throw, so the check could not be turned off, replaced or scoped, every test that
+  needed a Request needed a session, and the Kernel built a `Session` and a `CsrfToken` on every request whether or
+  not anything used them. It is `Middleware\VerifyCsrfToken` now, composed in by the application; leave it out and
+  the application boots with no session and no CSRF check.
+- **Not done: the physical package split.** `Session`, `CsrfToken` and `VerifyCsrfToken` still ship inside core.
+  Nothing in the request path references them, so moving them to their own repository is now mechanical — but it is
+  a packaging step (a new repository, a Packagist entry, a `require`) rather than a code change, and the done-when
+  below is only half met until it happens.
+- **Not done: interfaces for the other replaceable concerns.** Deliberately. Session storage, logging and view
+  rendering each have one implementation and no second in prospect, and the phase's own warning applies — an
+  interface with nothing to swap in is complexity charged against Human First. Write them when something real needs
+  to replace one.
 
 **Done when** an application can boot without the session package installed, and the core has no reference to it.
+The first half holds today and is tested. The second waits on the repository split.
+
+**The debt this created.** Middleware is declared in `public/index.php`, and the introspection commands do not load
+that file — they never construct application objects, and constructing a middleware list would start a session from
+a terminal. So `tether routes` and `tether context` cannot show what runs around a request. That is a Principle 6
+failure by the standard Phase 4 set, and fixing it means deciding where the declaration lives, because loading the
+list and constructing it are the same act.
 
 **Watch** This phase can quietly become an abstraction exercise. Only extract a concern something real would replace;
 an interface with one implementation and no prospect of a second is complexity charged against Human First.

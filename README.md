@@ -1,7 +1,7 @@
 # TetherPHP Core
 
 The core framework package behind [TetherPHP](https://github.com/Dillonsmart/tetherphp) — routing, request handling,
-sessions, CSRF protection, the console kernel and the code-generation stubs.
+sessions, CSRF protection as composable middleware, the console kernel and the code-generation stubs.
 
 This repository is the **source of truth** for the framework. The `dillonsmart/tetherphp` skeleton application consumes
 it as a Composer dependency; framework changes are made here, not there.
@@ -27,14 +27,15 @@ composer create-project dillonsmart/tetherphp ./
 
 ```
 src/
-├── Kernel.php          # Boots the app: session, CSRF, error handling, dispatch
+├── Kernel.php          # Boots the app: error handling, middleware, dispatch
 ├── Router.php          # Route registration, groups, static + dynamic matching
 └── framework/
     ├── Commands/       # Built-in console commands (make:*, routes, explain, inspect, context, serve, test)
     ├── Exceptions/     # HttpException and the statuses that subclass it
     ├── Helpers/        # Global functions and the Route view helper
     ├── Http/           # Response
-    ├── Interfaces/     # ActionInterface, DomainResult, RequestInterface, ResponderInterface
+    ├── Interfaces/     # ActionInterface, DomainResult, MiddlewareInterface, RequestInterface, ResponderInterface
+    ├── Middleware/     # VerifyCsrfToken
     ├── Modules/        # Console, Input, Env, Log
     ├── Requests/       # Request
     ├── Routing/        # Route (the result of matching)
