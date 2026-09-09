@@ -182,11 +182,18 @@ plug back in, so extracting one would have produced a package that could not be 
 **Done when** an application can boot without the session package installed, and the core has no reference to it.
 The first half holds today and is tested. The second waits on the repository split.
 
-**The debt this created.** Middleware is declared in `public/index.php`, and the introspection commands do not load
-that file — they never construct application objects, and constructing a middleware list would start a session from
-a terminal. So `tether routes` and `tether context` cannot show what runs around a request. That is a Principle 6
-failure by the standard Phase 4 set, and fixing it means deciding where the declaration lives, because loading the
-list and constructing it are the same act.
+**The debt this created, and paid.** Middleware was declared in `public/index.php`, which the introspection commands
+must not load, so nothing could show what runs around a request — a Principle 6 failure by the standard Phase 4 set.
+
+It is declared in `routes/middleware.php` now, beside `routes/web.php`: `web.php` says where a request goes, this
+says what it passes through. Moving it was only half the fix, because the console has to *build* the list to read the
+class names off it, and `new Session()` called `session_start()` in its constructor — listing middleware would have
+started a session from a terminal. Sessions start lazily now, on first use, which is the framework's own rule that a
+returned value beats a side effect applied to a constructor that had been quietly breaking it since the beginning.
+
+`routes`, `explain` and `context` all report the list in order. The contract that buys it — **building a middleware
+must have no side effects; do the work in `__invoke()`** — is documented, and asserted by a test that checks
+`session_status()` is unchanged after `tether routes` runs.
 
 **Watch** This phase can quietly become an abstraction exercise. Only extract a concern something real would replace;
 an interface with one implementation and no prospect of a second is complexity charged against Human First.

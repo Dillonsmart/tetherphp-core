@@ -70,6 +70,8 @@ class ExplainCommand extends Command
             $this->line($this->label('') . 'query string dropped before matching');
         }
 
+        $this->explainMiddleware();
+
         $route = $router->match($method, $path);
 
         if (!$route->matched) {
@@ -97,12 +99,42 @@ class ExplainCommand extends Command
     }
 
     /**
-     * One column for the stage, one for what it resolved to. 'Responder' is the
-     * longest stage name, so it sets the width.
+     * One column for the stage, one for what it resolved to. 'Middleware' is
+     * the longest stage name, so it sets the width.
      */
     private function label(string $stage): string
     {
-        return str_pad($stage, 9) . ' ';
+        return str_pad($stage, 10) . ' ';
+    }
+
+    /**
+     * Middleware wraps everything below it, including routing — so a request
+     * that goes on to 404 still passes through here, and a guard can answer it
+     * before a route is ever looked for. Leaving it out of this output made the
+     * command claim to show "the path a URI takes" while hiding the first thing
+     * that happens to it.
+     */
+    private function explainMiddleware(): void
+    {
+        ['names' => $names, 'problem' => $problem] = $this->applicationMiddleware();
+
+        if ($problem !== null) {
+            $this->error($this->label('Middleware') . $problem);
+
+            return;
+        }
+
+        if ($names === []) {
+            $this->line($this->label('Middleware') . 'none');
+
+            return;
+        }
+
+        foreach ($names as $index => $name) {
+            $this->line($this->label($index === 0 ? 'Middleware' : '') . $name);
+        }
+
+        $this->line($this->label('') . 'wraps everything below, outermost first');
     }
 
     private function explainView(string $view): int

@@ -153,10 +153,11 @@ literal string.
 ## The introspection commands
 
 `routes`, `explain`, `inspect` and `context` exist because of Principle 6 — a runtime feature is not finished until
-the tooling can show it. They **only report**; none of them changes an application, and none loads an application
-class to look at it (instantiating an Action would run its constructor and build a Domain and a Responder).
+the tooling can show it. They **only report**; none of them changes an application, and none instantiates an Action,
+Domain or Responder to look at it — doing so would run a constructor that builds two more objects.
 
-They share `Traits\InspectsApplication`, which loads `project_root() . '/routes/web.php'` and flattens the table.
+They share `Traits\InspectsApplication`, which loads `project_root() . '/routes/web.php'` and flattens the table, and
+`routes/middleware.php` for what wraps it — see below for the contract that makes loading the second one safe.
 `Router::match()` exists so they can resolve a URI without a `Request` — building one starts a session and enforces
 CSRF, which is right inside a request and impossible from a terminal.
 
@@ -292,13 +293,46 @@ Now an application composes it in, and one that leaves it out boots with no
 session and no CSRF check. `tests/Feature/CsrfProtectionTest.php` asserts both
 halves, including the application that opts out.
 
-**Known gap.** Middleware is declared in `public/index.php`, which the
-introspection commands deliberately do not load — they never construct
-application objects, and constructing this list would start a session from a
-terminal. So `tether routes` and `tether context` cannot yet show what runs
-around a request, which is a Principle 6 debt: moving the declaration somewhere
-loadable is a design decision, not a refactor, because loading it and
-constructing it are the same act.
+### Where the list is declared, and why it moved
+
+`routes/middleware.php`, next to `routes/web.php`. Everything in `routes/`
+answers one question: `web.php` says where a request goes, `middleware.php` says
+what it passes through. The file returns a callable, the way `web.php` does:
+
+```php
+return function (Env $env, Log $log): array {
+    return [
+        new VerifyCsrfToken(new Session(), $log),
+    ];
+};
+```
+
+It was declared in `public/index.php` for one release, and that made it
+invisible to the tooling: those commands must not load the file that boots and
+serves the application. `tether explain` claimed to show "the path a URI takes"
+while hiding the first thing that happens to it.
+
+Moving it was not enough on its own, because **the console has to build the
+list to read the class names off it** — and `new Session()` called
+`session_start()` in its constructor, so listing an application's middleware
+would have started a session from a terminal. Sessions start lazily now, on
+first use.
+
+That is the contract the whole approach rests on, and it belongs in any
+middleware anyone writes:
+
+> **Building a middleware must have no side effects.** Do the work in
+> `__invoke()`.
+
+`VerifyCsrfToken` holds a `Session` and is in the test fixture's list precisely
+to prove it: `IntrospectionTest::testBuildingTheMiddlewareListStartsNoSession`
+asserts `session_status()` is unchanged after `tether routes` runs.
+
+The rule that these commands never construct application objects still stands
+for Actions, Domains and Responders — instantiating an Action runs a constructor
+that builds two more objects. Middleware is the one exception, it is declared in
+a file written to be loaded, and it is bought with a stated contract rather than
+with a hope.
 
 ## Why `DomainResult` exists
 

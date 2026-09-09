@@ -82,7 +82,38 @@ class RoutesCommand extends Command
         $this->line();
         $this->line(count($routes) . ' route(s). A static route wins over a dynamic route of the same shape.');
 
+        $this->reportMiddleware();
+
         return self::COMMAND_SUCCESS;
+    }
+
+    /**
+     * Every route in the table goes through these first, so the table is only
+     * half the answer without them.
+     */
+    private function reportMiddleware(): void
+    {
+        ['names' => $names, 'problem' => $problem] = $this->applicationMiddleware();
+
+        $this->line();
+
+        if ($problem !== null) {
+            $this->error("Middleware: {$problem}");
+
+            return;
+        }
+
+        if ($names === []) {
+            $this->line('No middleware. Every request goes straight to routing.');
+
+            return;
+        }
+
+        $this->info('Every request passes through, outermost first:');
+
+        foreach ($names as $name) {
+            $this->line("  {$name}");
+        }
     }
 
     private function annotate(string $action): string

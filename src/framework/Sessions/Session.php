@@ -8,16 +8,53 @@ class Session
 {
     const int TIMEOUT = 1800; // 30 mins default - TODO make this configurable
 
-    public function __construct()
+    private bool $started = false;
+
+    /**
+     * Constructing a Session does nothing. Using one starts it.
+     *
+     * The constructor used to call session_start(), which meant merely naming
+     * a Session had an effect on the world: a cookie was issued, a file was
+     * written, and it happened whether or not anything went on to read or
+     * write a value. That was invisible while the Kernel built the Session
+     * itself, and became a problem the moment applications started composing
+     * middleware — `tether routes` and `tether context` cannot report what
+     * runs around a request without building the list, and building the list
+     * must not start a session from a terminal.
+     *
+     * It is also the rule the framework already states: a returned value beats
+     * a side effect, and a constructor that does work is the least visible
+     * place to put it.
+     */
+    private function ensureStarted(): void
     {
+        if ($this->started) {
+            return;
+        }
+
+        // set first: isExpired() may call destroy(), which comes back through
+        // the public API and would otherwise recurse
+        $this->started = true;
+
         $this->start();
 
         if ($this->isExpired()) {
-            // Session was destroyed, so start a new one
+            // the session was destroyed, so start a new one
             $this->start();
         }
 
         $this->reinitialize();
+    }
+
+    /**
+     * Whether anything has actually started this session yet.
+     *
+     * Lets a caller — the console above all — hold a Session without becoming
+     * responsible for one.
+     */
+    public function hasStarted(): bool
+    {
+        return $this->started;
     }
 
     /**
@@ -56,6 +93,8 @@ class Session
      */
     public function regenerateId(bool $deleteOldSession = true): void
     {
+        $this->ensureStarted();
+
         if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
             session_regenerate_id($deleteOldSession);
             $_SESSION['SESSION_ID'] = session_id();
@@ -78,6 +117,8 @@ class Session
 
     public function getSessionId(): string
     {
+        $this->ensureStarted();
+
         $id = $_SESSION['SESSION_ID'] ?? session_id();
 
         return is_string($id) ? $id : '';
@@ -97,16 +138,22 @@ class Session
 
     public function get(string $key): mixed
     {
+        $this->ensureStarted();
+
         return $_SESSION[$key] ?? null;
     }
 
     public function set(string $key, mixed $value): void
     {
+        $this->ensureStarted();
+
         $_SESSION[$key] = $value;
     }
 
     public function destroy(): void
     {
+        $this->ensureStarted();
+
         session_unset();
         session_destroy();
     }

@@ -201,6 +201,85 @@ class IntrospectionTest extends TestCase
         $this->assertTrue($routes['/greet']);
     }
 
+    /**
+     * The gap this closed: middleware was declared in public/index.php, which
+     * these commands must not load, so nothing could say what runs around a
+     * request. `explain` in particular claimed to show "the path a URI takes"
+     * while hiding the first thing that happens to it.
+     */
+    public function testExplainShowsTheMiddlewareARequestPassesThrough(): void
+    {
+        $output = $this->capture(ExplainCommand::class, '/greet');
+
+        $this->assertStringContainsString('Middleware', $output);
+        $this->assertStringContainsString('AddsHeader', $output);
+        $this->assertStringContainsString('VerifyCsrfToken', $output);
+    }
+
+    /**
+     * Order is the contract — the first declared is the outermost — so the
+     * output has to preserve it rather than merely list the classes.
+     */
+    public function testExplainKeepsTheDeclaredMiddlewareOrder(): void
+    {
+        $output = $this->capture(ExplainCommand::class, '/greet');
+
+        $this->assertLessThan(
+            strpos($output, 'VerifyCsrfToken'),
+            strpos($output, 'AddsHeader'),
+        );
+    }
+
+    /**
+     * A request that goes on to 404 still passes through the middleware, so
+     * explaining one has to say so.
+     */
+    public function testExplainShowsMiddlewareEvenWhenNothingMatches(): void
+    {
+        $output = $this->capture(ExplainCommand::class, '/nothing-here');
+
+        $this->assertStringContainsString('AddsHeader', $output);
+        $this->assertStringContainsString('no match', $output);
+    }
+
+    public function testRoutesReportsTheMiddlewareEveryRouteGoesThrough(): void
+    {
+        $output = $this->capture(RoutesCommand::class);
+
+        $this->assertStringContainsString('outermost first', $output);
+        $this->assertStringContainsString('VerifyCsrfToken', $output);
+    }
+
+    public function testContextCarriesTheMiddleware(): void
+    {
+        $context = json_decode($this->capture(ContextCommand::class), true);
+
+        $this->assertIsArray($context);
+        $this->assertNull($context['middleware']['problem']);
+        $this->assertSame(
+            [
+                'TetherPHP\Tests\Fixtures\app\Middleware\AddsHeader',
+                'TetherPHP\framework\Middleware\VerifyCsrfToken',
+            ],
+            $context['middleware']['names'],
+        );
+    }
+
+    /**
+     * The contract the whole approach rests on: the console builds the list
+     * only to read class names off it, so building one must not touch the
+     * world. VerifyCsrfToken holds a Session and is in the fixture list
+     * precisely to prove it.
+     */
+    public function testBuildingTheMiddlewareListStartsNoSession(): void
+    {
+        $before = session_status();
+
+        $this->capture(RoutesCommand::class);
+
+        $this->assertSame($before, session_status(), 'listing middleware must not start a session');
+    }
+
     public function testContextCanBePrettyPrinted(): void
     {
         $this->assertStringContainsString("\n    ", $this->capture(ContextCommand::class, '--pretty'));

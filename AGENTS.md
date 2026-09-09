@@ -68,7 +68,11 @@ reason each in [`docs/agents/framework.md`](docs/agents/framework.md#the-global-
 
 `Kernel::__construct(Router $router, Env $env, Log $log, array $middleware = [])`. A middleware is one method —
 `__invoke(Request $request, \Closure $next): Response` — and the list is given, never discovered, so the order things
-run in is the order they are written in the application's `public/index.php`.
+run in is the order it is written in the application's `routes/middleware.php`.
+
+**Building a middleware must have no side effects.** `tether routes`, `explain` and `context` build an application's
+list to report what runs around a request, so a constructor that opens a connection or starts a session does it from
+a terminal too. `Session` starts lazily for exactly this reason.
 
 The framework starts **no session** and checks **no CSRF token** on its own. Both used to be welded into the Kernel
 constructor, and CSRF was validated inside `Request::__construct()`; an application composes

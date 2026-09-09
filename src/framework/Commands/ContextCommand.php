@@ -50,6 +50,7 @@ class ContextCommand extends Command
             'root' => project_root(),
             'pipeline' => ['Request', 'Route', 'Action', 'Domain', 'Responder', 'Response'],
             'conventions' => $this->conventions(),
+            'middleware' => $this->middleware(),
             'routes' => $this->routes($router),
             'features' => $this->features($router),
             'commands' => $this->commands(),
@@ -128,6 +129,26 @@ class ContextCommand extends Command
                 'responder' => 'tether make:responder <name>',
                 'command' => 'tether make:command <name>',
             ],
+        ];
+    }
+
+    /**
+     * What runs around every request, in order.
+     *
+     * An agent reading this needs to know that a write will be refused without
+     * a CSRF token, or that a guard stands in front of every route. Neither is
+     * visible from the route table.
+     *
+     * @return array<string, mixed>
+     */
+    private function middleware(): array
+    {
+        ['names' => $names, 'problem' => $problem] = $this->applicationMiddleware();
+
+        return [
+            'wraps' => 'routing and the action, outermost first',
+            'names' => $names,
+            'problem' => $problem,
         ];
     }
 
