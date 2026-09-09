@@ -196,8 +196,16 @@ an interface with one implementation and no prospect of a second is complexity c
 - ~~Move the documentation website out of the skeleton into its own project.~~ **done** — it now lives in the
   private `tetherphp-website` repository, itself built on TetherPHP.
 - ~~Reduce the skeleton to a genuine minimum: one route, one ADR triple, one view.~~ **done**.
+- ~~Give the skeleton a test suite.~~ **done** — `tests/Unit` and `tests/Feature` split the way ADR does, a
+  `Tests\TestCase` that sends a request through the real Kernel, and `php tether test`. The command shipped in
+  Phase 4 pointing at a `vendor/bin/phpunit` that a generated application did not have.
 - Generate reference documentation from `tether context` and `tether explain`, so docs cannot drift.
 - Stabilise the public API and commit to semantic versioning at 1.0, where the major becomes the breaking signal.
+
+Both remaining items are decisions rather than refactors. Documentation generation needs somewhere to put the output
+(the website repository) and a format; the 1.0 freeze needs a judgement about which of `Request`, `Response`,
+`Router`, `Kernel`, `MiddlewareInterface` and the console's own output are being promised, and the seam is one
+release old.
 
 **Done when** `composer create-project dillonsmart/tetherphp` yields an application with nothing in it that a
 developer must first delete.
