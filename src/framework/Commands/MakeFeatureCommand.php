@@ -4,185 +4,70 @@ declare(strict_types=1);
 
 namespace TetherPHP\framework\Commands;
 
+use TetherPHP\framework\Traits\GeneratesFiles;
 use TetherPHP\framework\Traits\Strings;
 
 class MakeFeatureCommand extends Command
 {
+    use GeneratesFiles;
     use Strings;
 
     public string $command = 'make:feature';
 
-    public string $description = 'Creates a new feature';
+    public string $description = 'Create a whole ADR triple: Action, Domain, Result, Responder and view';
 
+    /** @var array<string, string> */
     protected array $arguments = [
         'name' => 'The name of the feature',
     ];
 
-    private string $className;
-
-    private string $viewName;
-
+    /**
+     * The five files of one feature, in the order they have to exist in.
+     *
+     * This used to be five private methods that each created a directory,
+     * refused to overwrite, read a stub, substituted and reported — the same
+     * six steps with a different path. They are now one list, and the same
+     * writer backs `make:action`, `make:domain` and `make:responder`, so a
+     * feature generated whole and a feature generated a piece at a time cannot
+     * drift apart.
+     *
+     * Order matters: the Domain's return type names the Result, and the
+     * Responder renders the view.
+     */
     public function execute(): int
     {
-        $featureName = $this->argument('name');
+        $name = $this->argument('name');
 
-        if (empty($featureName)) {
-            $this->error("Feature name cannot be empty.\n");
+        if ($name === '') {
+            $this->error('Feature name cannot be empty.');
+
             return self::COMMAND_INVALID_ARGUMENT;
         }
 
-        $this->className = $this->toValidClassName($featureName);
-        $this->viewName = $this->toKebabCase($this->className);
+        $className = $this->toPascalCase($name);
+        $viewName = $this->toKebabCase($className);
 
-        $actionResult = $this->createAction();
-        if ($actionResult !== self::COMMAND_SUCCESS) {
-            return $actionResult;
+        $replacements = ['className' => $className, 'viewName' => $viewName];
+
+        $files = [
+            'Result' => app_dir() . "/Domains/Results/{$className}.php",
+            'Domain' => app_dir() . "/Domains/{$className}.php",
+            'Responder' => app_dir() . "/Responders/{$className}.php",
+            'Action' => app_dir() . "/Actions/{$className}.php",
+            'View' => app_dir() . "/Views/pages/{$viewName}/index.php",
+        ];
+
+        foreach ($files as $stub => $path) {
+            $status = $this->writeStub($stub, $path, $replacements);
+
+            if ($status !== self::COMMAND_SUCCESS) {
+                return $status;
+            }
         }
 
-        // the Domain's return type names this class, so it has to exist first
-        $resultResult = $this->createResult();
-        if ($resultResult !== self::COMMAND_SUCCESS) {
-            return $resultResult;
-        }
-
-        $domainResult = $this->createDomain();
-        if ($domainResult !== self::COMMAND_SUCCESS) {
-            return $domainResult;
-        }
-
-        $responderResult = $this->createResponder();
-        if ($responderResult !== self::COMMAND_SUCCESS) {
-            return $responderResult;
-        }
-
-        // the generated Responder renders this view, so the feature has to ship
-        // with it or `make:feature` produces code that throws on first request
-        $viewResult = $this->createView();
-        if ($viewResult !== self::COMMAND_SUCCESS) {
-            return $viewResult;
-        }
-
-        $this->success("Feature '{$this->className}' created successfully.\n");
+        $this->success("Feature '{$className}' created.");
+        $this->info("Route it with: \$router->get('/{$viewName}', Actions\\{$className}::class);");
 
         return self::COMMAND_SUCCESS;
-    }
-
-    private function createAction(): int
-    {
-        $actionFilePath = app_dir() . "/Actions/{$this->className}.php";
-
-        if (file_exists($actionFilePath)) {
-            $this->error("Class already exists: {$actionFilePath}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        if (file_put_contents($actionFilePath, $this->generateTemplate('/Stubs/Action.txt')) === false) {
-            $this->error("Failed to create class: {$actionFilePath}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        $this->success("Action created successfully: {$actionFilePath}\n");
-        return self::COMMAND_SUCCESS;
-    }
-
-    /**
-     * The value object the Domain returns. It lives in its own directory
-     * because a feature can grow more than one — a list result and a single
-     * result are different types, not one array with a flag in it.
-     */
-    private function createResult(): int
-    {
-        $resultDir = app_dir() . '/Domains/Results';
-
-        if (!is_dir($resultDir) && !mkdir($resultDir, 0755, true) && !is_dir($resultDir)) {
-            $this->error("Failed to create directory: {$resultDir}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        $resultFilePath = $resultDir . "/{$this->className}.php";
-
-        if (file_exists($resultFilePath)) {
-            $this->error("Class already exists: {$resultFilePath}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        if (file_put_contents($resultFilePath, $this->generateTemplate('/Stubs/Result.txt')) === false) {
-            $this->error("Failed to create class: {$resultFilePath}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        $this->success("Result created successfully: {$resultFilePath}\n");
-        return self::COMMAND_SUCCESS;
-    }
-
-    private function createDomain(): int
-    {
-        $domainFilePath = app_dir() . "/Domains/{$this->className}.php";
-
-        if (file_exists($domainFilePath)) {
-            $this->error("Class already exists: {$domainFilePath}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        if (file_put_contents($domainFilePath, $this->generateTemplate('/Stubs/Domain.txt')) === false) {
-            $this->error("Failed to create class: {$domainFilePath}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        $this->success("Domain created successfully: {$domainFilePath}\n");
-        return self::COMMAND_SUCCESS;
-    }
-
-    private function createResponder(): int
-    {
-        $domainFilePath = app_dir() . "/Responders/{$this->className}.php";
-
-        if (file_exists($domainFilePath)) {
-            $this->error("Class already exists: {$domainFilePath}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        if (file_put_contents($domainFilePath, $this->generateTemplate('/Stubs/Responder.txt')) === false) {
-            $this->error("Failed to create class: {$domainFilePath}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        $this->success("Responder created successfully: {$domainFilePath}\n");
-        return self::COMMAND_SUCCESS;
-    }
-
-    private function createView(): int
-    {
-        $viewDir = app_dir() . "/Views/pages/{$this->viewName}";
-
-        if (!is_dir($viewDir) && !mkdir($viewDir, 0755, true) && !is_dir($viewDir)) {
-            $this->error("Failed to create view directory: {$viewDir}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        $viewFilePath = $viewDir . '/index.php';
-
-        if (file_exists($viewFilePath)) {
-            $this->error("View already exists: {$viewFilePath}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        if (file_put_contents($viewFilePath, $this->generateTemplate('/Stubs/View.txt')) === false) {
-            $this->error("Failed to create view: {$viewFilePath}\n");
-            return self::COMMAND_ERROR;
-        }
-
-        $this->success("View created successfully: {$viewFilePath}\n");
-        return self::COMMAND_SUCCESS;
-    }
-
-    private function generateTemplate(string $template): string
-    {
-        $template = file_get_contents(core_dir() . $template) ?: '';
-        return str_replace(
-            ['{{className}}', '{{viewName}}'],
-            [$this->className, $this->viewName],
-            $template
-        );
     }
 }

@@ -11,11 +11,6 @@ trait Strings
         return str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $string)));
     }
 
-    public function toValidClassName(string $string): string
-    {
-        return $this->toPascalCase($string);
-    }
-
     public function toKebabCase(string $string): string
     {
         $spaced = str_replace(['-', '_'], ' ', $string);

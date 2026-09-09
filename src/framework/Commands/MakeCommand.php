@@ -14,7 +14,8 @@ class MakeCommand extends Command
 
     public string $description = 'Create a new command';
 
-    public array $arguments = [
+    /** @var array<string, string> */
+    protected array $arguments = [
         'name' => 'The name of the command',
     ];
 
@@ -28,7 +29,7 @@ class MakeCommand extends Command
         }
 
         // 'send-emails', 'SendEmails' and 'SendEmailsCommand' all name the same command
-        $baseName = preg_replace('/Command$/', '', $this->toValidClassName($name));
+        $baseName = preg_replace('/Command$/', '', $this->toPascalCase($name));
 
         if (empty($baseName)) {
             $this->error("'{$name}' is not a valid command name.");

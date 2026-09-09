@@ -4,6 +4,9 @@
 declare(strict_types=1);
 
 use TetherPHP\framework\Modules\Console;
+use TetherPHP\framework\Modules\Input;
+use TetherPHP\framework\Modules\Env;
+use TetherPHP\framework\Modules\Log;
 
 // Composer 2.2+ sets this in the vendor/bin proxy. The fallback covers a
 // standalone checkout of core, where there is no proxy and no parent vendor.
@@ -16,6 +19,22 @@ if (!is_file($autoload)) {
 
 require_once $autoload;
 
+/*
+ * The console boots what the env() and logger() helpers delegate to, so a
+ * command can read a setting the same way an Action does.
+ *
+ * The environment is installed only when there is a file to read: make:* has to
+ * work in a checkout that has not been configured yet, and it did before this,
+ * so requiring a .env here would break generating code in a fresh application.
+ */
+$envFile = project_root() . '/.env';
+
+if (is_file($envFile)) {
+    Env::use(Env::fromFile($envFile));
+}
+
+Log::use(new Log(storage_dir() . 'logs/'));
+
 $args = array_slice($argv, 1);
 
 if ($args === []) {
@@ -23,4 +42,4 @@ if ($args === []) {
     exit(1);
 }
 
-exit(new Console($args[0])->executeCommand(array_slice($args, 1), []));
+exit(new Console($args[0])->executeCommand(Input::fromTokens(array_slice($args, 1))));

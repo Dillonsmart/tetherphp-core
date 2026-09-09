@@ -18,11 +18,24 @@ class Console
     private $errorStream;
 
     /**
-     * @param resource|null $errorStream defaults to stderr; pass a stream to capture
+     * `false` — the default — means stderr. A stream captures the diagnostics,
+     * and an explicit `null` silences them.
+     *
+     * The default used to be `null` and `?? STDERR` turned it back into stderr,
+     * so passing `errorStream: null` to silence a second Console did nothing:
+     * `tether help` builds one to list the commands and printed every
+     * registration diagnostic twice, once from each. Both call sites already
+     * said what they meant; only the parameter disagreed.
+     *
+     * @param resource|null|false $errorStream
      */
-    public function __construct(public string $command, $errorStream = null)
+    public function __construct(public string $command, mixed $errorStream = false)
     {
-        $this->errorStream = $errorStream ?? (defined('STDERR') ? STDERR : null);
+        if ($errorStream === false) {
+            $errorStream = defined('STDERR') ? STDERR : null;
+        }
+
+        $this->errorStream = is_resource($errorStream) ? $errorStream : null;
 
         $this->registerCommands();
         $this->reportSkipped();
@@ -113,18 +126,22 @@ class Console
     }
 
     /**
-     * @param list<string> $args
-     * @param array<string, string> $options
+     * Runs the dispatched command with the tokens it was given.
+     *
+     * The signature used to be (array $args, array $options) and `bin/tether`
+     * passed a literal empty array for the second, so no command could read an
+     * option. Both halves are now one parsed Input.
      */
-    public function executeCommand(array $args = [], array $options = []): int
+    public function executeCommand(?Input $input = null): int
     {
         if (isset($this->commands[$this->command])) {
-            $commandInstance = new $this->commands[$this->command]($args, $options);
+            $commandInstance = new $this->commands[$this->command]($input ?? new Input());
+
             return $commandInstance->execute();
         }
 
-        // TODO - If command methods are going to be called directly, maybe consider a shared trait.
-        (new \TetherPHP\framework\Commands\Command)->error("Command {$this->command} not found.");
+        new Command()->error("Command {$this->command} not found.");
+
         return Command::COMMAND_ERROR;
     }
 }

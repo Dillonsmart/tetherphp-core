@@ -27,20 +27,24 @@ composer create-project dillonsmart/tetherphp ./
 
 ```
 src/
-├── Kernel.php          # Boots the app: env, session, CSRF, error handling, dispatch
+├── Kernel.php          # Boots the app: session, CSRF, error handling, dispatch
 ├── Router.php          # Route registration, groups, static + dynamic matching
 └── framework/
-    ├── Commands/       # Built-in console commands (make:*, help, boilerplate:clear)
-    ├── DTOs/           # RouteDTO
+    ├── Commands/       # Built-in console commands (make:*, routes, explain, inspect, context, serve, test)
+    ├── Exceptions/     # HttpException and the statuses that subclass it
     ├── Helpers/        # Global functions and the Route view helper
-    ├── Interfaces/     # ActionInterface, RequestInterface, ResponderInterface
-    ├── Modules/        # Console, Env, Log
+    ├── Http/           # Response
+    ├── Interfaces/     # ActionInterface, DomainResult, RequestInterface, ResponderInterface
+    ├── Modules/        # Console, Input, Env, Log
     ├── Requests/       # Request
+    ├── Routing/        # Route (the result of matching)
     ├── Sessions/       # Session, CsrfToken
     ├── Stubs/          # Templates used by the make:* commands
-    ├── Traits/         # Strings
+    ├── Traits/         # Strings, GeneratesFiles, InspectsApplication
     └── Views/          # Fallback error views
 tests/
+├── Feature/            # needs the fixture application
+├── Fixtures/           # the application and routes linked into place by the bootstrap
 └── Unit/
 ```
 

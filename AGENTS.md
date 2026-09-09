@@ -53,6 +53,17 @@ application**. Never read a framework-shipped asset (stubs, fallback error views
 read an application file through `core_dir()`. Getting this wrong still works in a linked local checkout and only
 fails once the package is installed under `vendor/` — `tests/Unit/GlobalFunctionsTest.php` is the regression guard.
 
+## What the Kernel is given
+
+`Kernel::__construct(Router $router, Env $env, Log $log)`. The environment file and the log directory are chosen by
+the application in `public/index.php`, not found by the framework — `Env::getInstance()` and the static `Log` are
+gone as of `v0.8.0`.
+
+The Kernel installs both for the `env()` and `logger()` helpers, which are one-line delegates and the **only**
+callers of `Env::current()` / `Log::current()`. A framework class reaching for `current()` instead of taking the
+object through its constructor is a review failure. The global functions are a closed list of ten, documented with a
+reason each in [`docs/agents/framework.md`](docs/agents/framework.md#the-global-functions-are-a-closed-list).
+
 ## Where a change belongs
 
 | Change                                                       | Repository       |

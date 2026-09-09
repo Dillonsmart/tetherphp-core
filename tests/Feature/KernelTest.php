@@ -6,6 +6,8 @@ namespace TetherPHP\Tests\Feature;
 
 use PHPUnit\Framework\TestCase;
 use TetherPHP\framework\Http\Response;
+use TetherPHP\framework\Modules\Env;
+use TetherPHP\framework\Modules\Log;
 use TetherPHP\Kernel;
 use TetherPHP\Router;
 
@@ -44,12 +46,27 @@ class KernelTest extends TestCase
         $this->kernels = [];
     }
 
+    /**
+     * The Kernel is handed an environment and a log rather than finding them.
+     * A test can now state the settings it is exercising — APP_DEBUG here —
+     * without writing a .env file into the repository.
+     */
     private function kernel(): Kernel
     {
-        $kernel = new Kernel($this->router);
+        $kernel = new Kernel($this->router, $this->env(), $this->log());
         $this->kernels[] = $kernel;
 
         return $kernel;
+    }
+
+    private function env(): Env
+    {
+        return new Env(['APP_NAME' => 'TetherPHP Tests', 'APP_DEBUG' => 'false']);
+    }
+
+    private function log(): Log
+    {
+        return new Log(sys_get_temp_dir() . '/tether-kernel-test-logs');
     }
 
     private function get(string $uri): Response
@@ -211,7 +228,7 @@ class KernelTest extends TestCase
     {
         $before = get_error_handler();
 
-        $kernel = new Kernel($this->router);
+        $kernel = new Kernel($this->router, $this->env(), $this->log());
         $this->assertNotSame($before, get_error_handler(), 'the Kernel should install its handler');
 
         $kernel->restoreErrorHandlers();
@@ -224,7 +241,7 @@ class KernelTest extends TestCase
      */
     public function testItDoesNotRemoveAHandlerInstalledAfterIt(): void
     {
-        $kernel = new Kernel($this->router);
+        $kernel = new Kernel($this->router, $this->env(), $this->log());
 
         $mine = static fn (): bool => true;
         set_error_handler($mine);

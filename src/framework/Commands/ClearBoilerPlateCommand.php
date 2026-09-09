@@ -13,6 +13,11 @@ class ClearBoilerPlateCommand extends Command
     /** @var array<string, string> */
     protected array $arguments = [];
 
+    /** @var array<string, string> */
+    protected array $options = [
+        'force' => 'Skip the confirmation prompt',
+    ];
+
     /**
      * The base classes every generated Action, Domain and Responder extends.
      *
@@ -123,7 +128,10 @@ class ClearBoilerPlateCommand extends Command
      */
     private function confirm(): bool
     {
-        if (in_array('--force', $this->args, true)) {
+        // this used to scan the raw argument list for the literal string
+        // '--force', because nothing parsed options; the flag is declared now
+        // and `tether help boilerplate:clear` says so
+        if ($this->hasOption('force')) {
             return true;
         }
 

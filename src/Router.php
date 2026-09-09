@@ -121,8 +121,23 @@ class Router
 
     public function routeAction(Request $request): Route
     {
-        $routes = $this->routesFor($request->method);
-        $uri = $request->uri;
+        return $this->match($request->method, $request->uri);
+    }
+
+    /**
+     * Resolves a method and URI to a Route.
+     *
+     * Split out of routeAction() so that resolving a route does not require a
+     * Request — building one starts a session and enforces CSRF, which is the
+     * right thing inside a request and impossible from the console. `tether
+     * explain` asks this question without being a request, and so can a test.
+     *
+     * The URI is matched exactly as given: Request lowercases it through a
+     * property hook, so a caller outside a request has to do the same.
+     */
+    public function match(string $method, string $uri): Route
+    {
+        $routes = $this->routesFor($method);
 
         if (array_key_exists($uri, $routes)) {
             return Route::to($routes[$uri]['action'], $routes[$uri]['type']);

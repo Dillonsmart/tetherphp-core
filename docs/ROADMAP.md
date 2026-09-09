@@ -3,7 +3,7 @@
 Taking the framework from working to compliant with its [six core principles](../AGENTS.md#the-six-core-principles).
 Ordered by dependency: Phases 2 and 3 are both breaking and ship together so consumers migrate once.
 
-Current: `v0.5.0`. Target: `v1.0`.
+Current: `v0.8.0`. Target: `v1.0`.
 
 Items struck through below have landed since this roadmap was written.
 
@@ -13,9 +13,8 @@ Items struck through below have landed since this roadmap was written.
 Request → Route → Action → Domain → Responder → Response
 ```
 
-There is no `Response` object. `Kernel::run()` returns a string, or echoes a rendered view, or `include`s an error
-page and calls `exit()` — three exits from one method. That is the largest obstacle to a traceable pipeline, and
-Phase 2 is entirely about it.
+Every stage now has a representation in code and the Kernel has one exit. Phase 2 was entirely about that; what is
+left is what the pipeline cannot yet be *asked about* (Phase 4) and what it cannot yet be *extended with* (Phase 5).
 
 ## Audit
 
@@ -103,36 +102,58 @@ them being registerable.
 
 **Risk** Every existing Action's signature changes. The skeleton and the website update in lockstep with the release.
 
-## Phase 3 — Explicit dependencies · `v0.4.0`, breaking
+## Phase 3 — Explicit dependencies · `v0.8.0`, breaking — **done**
 
 Remove the ambient state. What a thing needs should arrive through its constructor.
 
-- Retire the `Env` singleton. Construct once in `Kernel` and pass it down; `getInstance()` goes.
-- `Log` becomes an instance with a configured destination.
-- Decide the global-function contract deliberately. They serve Human First and should not all die — but each survivor
-  must be a thin delegate to an explicit object, and the list must be documented and closed.
-- Collapse `toValidClassName()` into `toPascalCase()`.
+- ~~Retire the `Env` singleton. Construct once in `Kernel` and pass it down; `getInstance()` goes.~~ **done** — `Env`
+  is an immutable value object built by `Env::fromFile()`, and `Kernel::__construct()` takes one. A missing key
+  returns a default instead of throwing an exception for `env()` to catch, log and swallow.
+- ~~`Log` becomes an instance with a configured destination.~~ **done** — the directory is a constructor argument,
+  so `Log` no longer reaches for `storage_dir()` and a Kernel under test logs somewhere harmless.
+- ~~Decide the global-function contract deliberately.~~ **done** — ten functions, documented with a reason each in
+  `docs/agents/framework.md`, and closed. Eight are pure functions of the install path; `env()` and `logger()` are
+  one-line delegates to the objects the Kernel installed. `view()` was **removed**: it included a template directly,
+  which is a second way to render a page and does none of the data-naming a Responder exists for.
+- ~~Collapse `toValidClassName()` into `toPascalCase()`.~~ **done**.
 
-**Done when** no framework class reaches for global state to do its job, and the surviving global functions are
-enumerated in `AGENTS.md` with a stated reason for each.
+**Done.** No framework class reaches for global state to do its job. `Env::current()` and `Log::current()` have
+exactly two callers between them — the two helpers — and both throw, naming the fix, rather than lazily constructing
+themselves from `project_root()` the way `getInstance()` did.
 
 **Ship with Phase 2** — one migration guide, one upgrade.
 
-## Phase 4 — The CLI becomes the product · `v0.5.0`
+**What it did not reach.** PHPStan level 9. `$_SERVER` and `$_POST` still enter `Kernel` untyped and `Session::get()`
+still returns `mixed`, so values derived from them are `mixed` too. Typing that boundary is its own change — it is
+also what would finally expose the query string, which no application can currently read.
+
+## Phase 4 — The CLI becomes the product · `v0.8.0` — **done**
 
 Principle 6 taken literally: the framework should explain the application, not merely run it.
 
-- A real argument and option parser. `Command::argument()` stops binding by position; `$opts` starts working.
-- `make:action`, `make:domain`, `make:responder` to complement `make:feature`.
-- `tether routes` — the resolved route table, static and dynamic.
-- `tether explain <uri>` — the concrete path a URI takes through the pipeline. The pipeline principle made executable.
-- `tether inspect <class>` — what a class is in ADR terms and what it depends on.
-- `tether context` — machine-readable JSON map of the application for agents: routes, ADR triples, commands,
-  conventions.
-- `tether test` and `tether serve`.
+- ~~A real argument and option parser.~~ **done** — `Modules\Input`. Options were never parsed at all: `bin/tether`
+  passed a literal empty array for them, which is why `boilerplate:clear` searched its own raw argument list for the
+  string `--force`. Commands declare `$arguments` and `$options`, and both appear in `tether help <command>`.
+- ~~`make:action`, `make:domain`, `make:responder`~~ **done**, on the same writer as `make:feature`, so a feature
+  generated whole and one generated a piece at a time cannot drift apart. `make:domain` writes the Result with the
+  Domain and `make:responder` the view with the Responder, because neither half loads without the other.
+- ~~`tether routes`~~ **done** — and it marks a route whose Action is missing or not routable, which was previously
+  a 500 nobody saw until someone requested it.
+- ~~`tether explain <uri>`~~ **done** — resolves the URI the way a request would, lowercased and without its query
+  string, and names the parameters it would capture.
+- ~~`tether inspect <class>`~~ **done**.
+- ~~`tether context`~~ **done** — JSON on stdout: routes, ADR triples, commands, directories, namespaces and the
+  rules that are otherwise folklore.
+- ~~`tether test` and `tether serve`~~ **done**. `test` forwards to the application's own PHPUnit rather than
+  vendoring a runner into core.
 
-**Done when** an agent handed only `tether context` output can correctly name where a new feature's files belong and
-which existing route would conflict.
+**Done.** `tests/Feature/IntrospectionTest.php` asserts the keys the done-when depends on, against a fixture route
+table that includes a broken route and an unroutable one.
+
+Two things fell out of the work. `Console`'s error stream could not actually be silenced — `null` was both the
+default and the way to ask for silence, so `tether help` printed every registration diagnostic twice. And the Kernel
+defined `VERSION` and `VERSION_NAME` from two hand-maintained properties that nothing read and that still said
+"0.5 alpha" at v0.7.0; they are gone, and `context` asks Composer what is installed.
 
 ## Phase 5 — Seams and packages · `v0.6.0`
 

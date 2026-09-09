@@ -4,44 +4,101 @@ declare(strict_types=1);
 
 namespace TetherPHP\framework\Modules;
 
-class Env
+/**
+ * The application's environment file, parsed once and held as a value.
+ *
+ * This used to be a singleton that located its own `.env` through
+ * project_root() and constructed itself on first use. Nothing could say where a
+ * value came from, and no test could supply a different set without moving a
+ * file on disk — the anonymous subclass that `EnvParsingTest` needed to reach
+ * loadEnv() was the evidence. An Env is now constructed with the variables it
+ * holds, and reading the file is a separate, named step.
+ *
+ * `use()` and `current()` exist for exactly one caller: the `env()` helper.
+ * Application code in a view or a Domain should not have to thread an object
+ * through to read a setting, so the boot installs the instance that helper
+ * delegates to. Framework classes take an Env through their constructor and
+ * never call `current()`.
+ */
+final class Env
 {
-    protected static ?Env $instance = null;
-    protected string $basePath = '';
-    /** @var array<string, string> */
-    protected array $envVars = [];
+    private static ?self $current = null;
 
-    /**
-     * @throws \Exception
-     */
-    public function __construct()
+    /** @param array<string, string> $vars */
+    public function __construct(private readonly array $vars = [])
     {
-        $this->basePath = project_root();
-        $this->loadEnv();
-    }
-
-    public static function getInstance(): Env
-    {
-        if (self::$instance === null) {
-            self::$instance = new Env();
-        }
-        return self::$instance;
     }
 
     /**
-     * @throws \Exception
+     * @throws \RuntimeException when there is no file to read
      */
-    public function loadEnv(): void
+    public static function fromFile(string $path): self
     {
-        $envFile = $this->basePath . '/.env';
-
-        if(!file_exists($envFile)){
-            throw new \Exception('Env file not found');
+        if (!is_file($path)) {
+            throw new \RuntimeException("Environment file not found at {$path}.");
         }
 
-        $envContent = file_get_contents($envFile) ?: '';
+        return new self(self::parse(file_get_contents($path) ?: ''));
+    }
 
-        foreach (preg_split('/\R/', $envContent) ?: [] as $line) {
+    /**
+     * Installs the instance the `env()` helper reads.
+     *
+     * The Kernel calls this at boot, and `bin/tether` calls it when the
+     * application has a `.env` to read.
+     */
+    public static function use(self $env): void
+    {
+        self::$current = $env;
+    }
+
+    /**
+     * @throws \RuntimeException when nothing has been installed
+     */
+    public static function current(): self
+    {
+        if (self::$current === null) {
+            throw new \RuntimeException(
+                'No environment has been loaded. The Kernel installs one at boot; '
+                . 'call Env::use(Env::fromFile($path)) first if you are running outside it.',
+            );
+        }
+
+        return self::$current;
+    }
+
+    /**
+     * A missing key returns the default rather than throwing.
+     *
+     * getEnv() used to throw and `env()` caught it, logged it and returned
+     * null — an exception used as control flow between two halves of the same
+     * feature. A key that is not set is not an error; it is a value the caller
+     * has an opinion about.
+     */
+    public function get(string $key, ?string $default = null): ?string
+    {
+        return $this->vars[$key] ?? $default;
+    }
+
+    public function has(string $key): bool
+    {
+        return array_key_exists($key, $this->vars);
+    }
+
+    /** @return array<string, string> */
+    public function all(): array
+    {
+        return $this->vars;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function parse(string $contents): array
+    {
+        $vars = [];
+
+        foreach (preg_split('/\R/', $contents) ?: [] as $line) {
             $line = trim($line);
 
             if ($line === '' || str_starts_with($line, '#')) {
@@ -64,21 +121,9 @@ class Env
                 $value = trim(preg_replace('/\s+#.*$/', '', $value) ?? $value);
             }
 
-            $this->envVars[$key] = trim($value, "\"'");
-        }
-    }
-
-    /**
-     * @throws \Exception
-     */
-    public function getEnv(string $key): string
-    {
-        if (array_key_exists($key, $this->envVars)) {
-            return $this->envVars[$key];
+            $vars[$key] = trim($value, "\"'");
         }
 
-        // not logged here — the caller decides whether a missing key is a problem,
-        // and env() already logs the ones it swallows
-        throw new \Exception("Environment variable '{$key}' not found.");
+        return $vars;
     }
 }

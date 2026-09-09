@@ -4,18 +4,57 @@ declare(strict_types=1);
 
 namespace TetherPHP\framework\Modules;
 
-class Log
+/**
+ * Appends lines to a log file in a configured directory.
+ *
+ * Every method used to be static and the directory came from storage_dir(), so
+ * a Log could only ever write to one place and nothing that used it could be
+ * tested without writing into the repository. The destination is now a
+ * constructor argument, which is what makes a Kernel under test able to log
+ * into a temporary directory.
+ *
+ * `use()` and `current()` back the `logger()` helper, on the same terms as
+ * Env: the boot installs the instance, framework classes are given one.
+ */
+final class Log
 {
-    private const  LOG_DIR = 'logs/';
+    private static ?self $current = null;
 
-    public static function error(string $message): void
+    public function __construct(private readonly string $directory)
     {
-        self::writeLog('error', $message);
     }
 
-    public static function info(string $message): void
+    /**
+     * Installs the instance the `logger()` helper writes to.
+     */
+    public static function use(self $log): void
     {
-        self::writeLog('info', $message);
+        self::$current = $log;
+    }
+
+    /**
+     * @throws \RuntimeException when nothing has been installed
+     */
+    public static function current(): self
+    {
+        if (self::$current === null) {
+            throw new \RuntimeException(
+                'No log has been configured. The Kernel installs one at boot; '
+                . 'call Log::use(new Log($directory)) first if you are running outside it.',
+            );
+        }
+
+        return self::$current;
+    }
+
+    public function error(string $message): void
+    {
+        $this->write('error', $message);
+    }
+
+    public function info(string $message): void
+    {
+        $this->write('info', $message);
     }
 
     /**
@@ -26,24 +65,24 @@ class Log
      * fire and an unwritable storage directory would lose every log silently.
      * Failures fall back to PHP's own error log instead.
      */
-    private static function writeLog(string $level, string $message): void
+    private function write(string $level, string $message): void
     {
-        $logDir = storage_dir() . self::LOG_DIR;
+        $directory = rtrim($this->directory, '/') . '/';
 
-        if (!is_dir($logDir) && !@mkdir($logDir, 0755, true) && !is_dir($logDir)) {
-            error_log("TetherPHP: cannot create log directory {$logDir}");
+        if (!is_dir($directory) && !@mkdir($directory, 0755, true) && !is_dir($directory)) {
+            error_log("TetherPHP: cannot create log directory {$directory}");
             error_log("[{$level}] {$message}");
 
             return;
         }
 
-        $logFile = $logDir . date('Y-m-d') . '.log';
-        $logMessage = '[' . date('Y-m-d H:i:s') . "] [$level] $message" . PHP_EOL;
+        $file = $directory . date('Y-m-d') . '.log';
+        $line = '[' . date('Y-m-d H:i:s') . "] [{$level}] {$message}" . PHP_EOL;
 
         // LOCK_EX: concurrent requests append to the same file and would
         // otherwise interleave mid-line
-        if (@file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX) === false) {
-            error_log("TetherPHP: cannot write to {$logFile}");
+        if (@file_put_contents($file, $line, FILE_APPEND | LOCK_EX) === false) {
+            error_log("TetherPHP: cannot write to {$file}");
             error_log("[{$level}] {$message}");
         }
     }

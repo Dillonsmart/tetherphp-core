@@ -7,5 +7,6 @@
 
 # created by tests/bootstrap.php
 /app
+/routes
 /.env
 /storage

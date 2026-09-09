@@ -21,10 +21,6 @@ class Kernel
 {
     protected Request $request;
 
-    protected string $versionName = "0.5 alpha";
-
-    protected float $versionNumber = 0.5;
-
     protected Session $session;
 
     /** The handlers this Kernel installed, kept so they can be taken back off. */
@@ -33,19 +29,25 @@ class Kernel
     private ?\Closure $exceptionHandler = null;
 
     /**
+     * The environment and the log arrive as arguments rather than being found.
+     *
+     * Both used to be reached statically from inside the request — `Env` built
+     * itself from project_root() on first use, `Log` wrote to storage_dir()
+     * with no way to say otherwise. What the Kernel needs to do its job now
+     * comes through its constructor, and `public/index.php` is where a reader
+     * can see which environment file and which log directory are in play.
+     *
+     * Installing them for the `env()` and `logger()` helpers is the one side
+     * effect here, and it is deliberate: application code in a view or a Domain
+     * should not have to thread an object through to read a setting. Those two
+     * functions are the only readers of `Env::current()` and `Log::current()`.
+     *
      * @throws \Exception
      */
-    public function __construct(protected Router $router)
+    public function __construct(protected Router $router, protected Env $env, protected Log $log)
     {
-        Env::getInstance();
-
-        if (!defined('VERSION_NAME')) {
-            define('VERSION_NAME', $this->versionName);
-        }
-
-        if (!defined('VERSION')) {
-            define('VERSION', $this->versionNumber);
-        }
+        Env::use($this->env);
+        Log::use($this->log);
 
         $this->setErrorHandler();
 
@@ -70,8 +72,8 @@ class Kernel
         } catch (HttpException $e) {
             return $this->exceptionResponse($e);
         } catch (\Throwable $e) {
-            Log::error('Uncaught: ' . $e->getMessage());
-            Log::error($e->getTraceAsString());
+            $this->log->error('Uncaught: ' . $e->getMessage());
+            $this->log->error($e->getTraceAsString());
 
             return $this->exceptionResponse(new HttpInternalServerErrorException());
         }
@@ -97,7 +99,7 @@ class Kernel
             );
         } catch (\Exception $e) {
             // A rejected write is a client error, not a server one.
-            Log::error('Rejected request: ' . $e->getMessage());
+            $this->log->error('Rejected request: ' . $e->getMessage());
 
             throw new HttpForbiddenException();
         }
@@ -135,7 +137,7 @@ class Kernel
     private function invoke(Route $route): Response
     {
         if (!class_exists($route->action)) {
-            Log::error("Route points at {$route->action}, which does not exist.");
+            $this->log->error("Route points at {$route->action}, which does not exist.");
 
             throw new HttpInternalServerErrorException('The route points at an action that does not exist.');
         }
@@ -143,7 +145,7 @@ class Kernel
         $action = new $route->action($this->request);
 
         if (!$action instanceof ActionInterface) {
-            Log::error(sprintf(
+            $this->log->error(sprintf(
                 '%s must implement %s to be routable.',
                 $route->action,
                 ActionInterface::class,
@@ -180,7 +182,7 @@ class Kernel
         $file = views_dir() . str_replace('.', '/', $view) . '.php';
 
         if (!file_exists($file)) {
-            Log::error("View route points at {$view}, which does not exist.");
+            $this->log->error("View route points at {$view}, which does not exist.");
 
             throw new HttpInternalServerErrorException('The route points at a view that does not exist.');
         }
@@ -275,7 +277,7 @@ class Kernel
 
     private function setErrorHandler(): void
     {
-        if (env('APP_DEBUG') === 'true') {
+        if ($this->env->get('APP_DEBUG') === 'true') {
             error_reporting(E_ALL);
             ini_set('display_errors', '1');
         } else {
@@ -284,7 +286,7 @@ class Kernel
         }
 
         $this->errorHandler = function ($errno, $errstr, $errfile, $errline) {
-            Log::error("Error [$errno]: $errstr in $errfile on line $errline");
+            $this->log->error("Error [$errno]: $errstr in $errfile on line $errline");
 
             // Notices, warnings and deprecations are logged, not fatal. Replacing
             // the page with a 500 because something was deprecated hides the real
@@ -299,8 +301,8 @@ class Kernel
         };
 
         $this->exceptionHandler = function ($exception) {
-            Log::error("Uncaught Exception: " . $exception->getMessage());
-            Log::error("Uncaught Exception: " . $exception->getTraceAsString());
+            $this->log->error("Uncaught Exception: " . $exception->getMessage());
+            $this->log->error("Uncaught Exception: " . $exception->getTraceAsString());
 
             $this->renderFatalError();
         };

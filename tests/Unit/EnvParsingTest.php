@@ -8,9 +8,11 @@ use PHPUnit\Framework\TestCase;
 use TetherPHP\framework\Modules\Env;
 
 /**
- * Env reads project_root() . '/.env', which in this repository is the fixture
- * .env written by tests/bootstrap.php. These tests drive loadEnv() against a
- * temporary file instead, so parsing can be exercised without moving it.
+ * Parsing is exercised through the constructor and fromFile().
+ *
+ * These tests used to need an anonymous subclass to reach a protected
+ * loadEnv(), because an Env found its own file and there was no way to hand it
+ * one. That was the clearest evidence the singleton had to go.
  */
 class EnvParsingTest extends TestCase
 {
@@ -33,21 +35,7 @@ class EnvParsingTest extends TestCase
     {
         file_put_contents($this->file, $contents);
 
-        $env = new class(dirname($this->file)) extends Env {
-            public function __construct(private string $root)
-            {
-                $this->basePath = $this->root;
-                $this->loadEnv();
-            }
-
-            /** @return array<string, string> */
-            public function all(): array
-            {
-                return $this->envVars;
-            }
-        };
-
-        return $env->all();
+        return Env::fromFile($this->file)->all();
     }
 
     public function testReadsKeyValuePairs(): void
@@ -104,5 +92,24 @@ class EnvParsingTest extends TestCase
     public function testKeepsAnEqualsSignInTheValue(): void
     {
         $this->assertSame(['DSN' => 'k=v;x=y'], $this->parse("DSN=k=v;x=y\n"));
+    }
+
+    public function testAMissingKeyReturnsTheDefaultRatherThanThrowing(): void
+    {
+        $env = new Env(['APP_NAME' => 'TetherPHP']);
+
+        $this->assertNull($env->get('NOT_SET'));
+        $this->assertSame('fallback', $env->get('NOT_SET', 'fallback'));
+        $this->assertFalse($env->has('NOT_SET'));
+    }
+
+    public function testAMissingFileSaysWhichPathItLookedAt(): void
+    {
+        $path = dirname($this->file) . '/.env.absent';
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage($path);
+
+        Env::fromFile($path);
     }
 }

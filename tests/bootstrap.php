@@ -9,12 +9,17 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
  * repository is the repository itself. To exercise anything that reads app_dir()
  * or views_dir() — the Kernel, the Console, the make:* commands — a minimal
  * application has to exist at that root, so tests/Fixtures/app is linked into
- * place. Both the link and the .env below are gitignored.
+ * place, and tests/Fixtures/routes alongside it for the commands that read a
+ * route table. The links and the .env below are all gitignored.
  */
 $root = dirname(__DIR__);
 
 if (!file_exists($root . '/app')) {
     symlink($root . '/tests/Fixtures/app', $root . '/app');
+}
+
+if (!file_exists($root . '/routes')) {
+    symlink($root . '/tests/Fixtures/routes', $root . '/routes');
 }
 
 if (!file_exists($root . '/.env')) {

@@ -19,22 +19,25 @@ decide a framework change: **Small & Composable** (could this be a package inste
 ```
 bin/tether              # the console binary, declared as Composer `bin`
 src/
-├── Kernel.php          # boot: env, session, CSRF, error handlers, dispatch
+├── Kernel.php          # boot: session, CSRF, error handlers, dispatch
 ├── Router.php          # registration, groups, static + dynamic matching
 └── framework/
     ├── Commands/       # built-in console commands
     ├── Exceptions/     # HttpException and its status subclasses
-    ├── Http/           # Response
-    ├── Routing/        # Route
     ├── Helpers/        # GlobalFunctions.php (Composer `files`), Route
+    ├── Http/           # Response
     ├── Interfaces/     # ActionInterface, DomainResult, RequestInterface, ResponderInterface
-    ├── Modules/        # Console, Env, Log
+    ├── Modules/        # Console, Input, Env, Log
     ├── Requests/       # Request
+    ├── Routing/        # Route (the result of matching)
     ├── Sessions/       # Session, CsrfToken
     ├── Stubs/          # *.txt templates for the make:* commands
-    ├── Traits/         # Strings
+    ├── Traits/         # Strings, GeneratesFiles, InspectsApplication
     └── Views/errors/   # fallback error views
-tests/Unit/
+tests/
+├── Feature/            # needs the fixture application
+├── Fixtures/           # the app and routes the bootstrap links into place
+└── Unit/
 ```
 
 `TetherPHP\` is PSR-4 mapped to `src/`. A file at `src/framework/Modules/Log.php` is
@@ -58,6 +61,30 @@ precisely so it survives installation into `vendor/dillonsmart/tetherphp-core`. 
 
 `project_root()` uses `Composer\InstalledVersions::getRootPackage()`, so it only works when the autoloader is loaded —
 it cannot be called before `vendor/autoload.php`.
+
+## The global functions are a closed list
+
+There are ten, they all live in `src/framework/Helpers/GlobalFunctions.php`, and **the list does not grow without a
+principle argument in the commit message.** A global function is ambient by definition, which puts it at odds with
+Explicit Over Magic; each of these survives because the alternative — threading an object into a template — costs
+more readability than it buys.
+
+| Function                                                | Delegates to                          | Why it exists                                                        |
+| ------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------- |
+| `project_root()`, `package_root()`, `core_dir()`, `core_views()`, `app_dir()`, `storage_dir()`, `views_dir()`, `public_dir()` | Composer's `InstalledVersions`, or `__DIR__` | Pure functions of where the code is installed. They derive a path; they hold nothing and nothing can change them. |
+| `env($key, $default = null)`                             | `Env::current()->get()`                | A view or a Domain reading one setting should not have to be handed an `Env` to do it. |
+| `logger($message, $level)`                               | `Log::current()->error()` / `->info()` | The same argument, for the same reason.                              |
+
+Only `env()` and `logger()` touch state, and both are **one-line delegates to an object the Kernel installed** —
+they make no decision the object does not, and they cannot be the place a bug hides. `Env::current()` and
+`Log::current()` have exactly these two callers; a framework class takes an `Env` or a `Log` through its constructor
+instead, and calling `current()` from one is a review failure.
+
+Both throw if nothing was installed, naming the fix. That is deliberate: the old `Env::getInstance()` constructed
+itself from `project_root()` on first use, so a missing boot looked like a missing variable.
+
+`view()` was removed in `v0.8.0`. It included a template directly, which is what a Responder is for — a second way
+to render a page, with none of the data-naming the Responder exists to do.
 
 ## PHP version
 
@@ -88,11 +115,57 @@ Do not "simplify" these into older forms.
    check is **skipped with a reason** written to stderr and recorded in `Console::skipped()` — it used to disappear
    silently, which made a misnamed class, a missing psr-4 mapping and a file that was never written
    indistinguishable. Duplicate command names and a missing `$command` are reported the same way.
-4. `Console` takes an optional error stream as its second argument, so tests can capture diagnostics instead of
-   letting them reach stderr.
+4. `Console` takes an error stream as its second argument: omit it for stderr, pass a stream to capture diagnostics
+   in a test, or pass an explicit `null` to silence them. `null` used to be the default *and* the way to silence,
+   and `?? STDERR` turned it straight back into stderr — which is why `tether help` printed every diagnostic twice.
+
+**Only commands go in `Commands/`.** The directory is globbed, so any other class in it is registered, fails the
+subclass check and is reported as a broken command. `Input` lives in `Modules/` for exactly that reason.
 
 Applications get their own commands from `app/Commands/` under the `Commands\` namespace; that mapping lives in the
 skeleton's `composer.json`.
+
+### Arguments and options
+
+A command declares what it takes, and `Input` parses what it was given:
+
+```php
+/** @var array<string, string> */
+protected array $arguments = ['name' => 'The name of the feature'];
+
+/** @var array<string, string> */
+protected array $options = ['force' => 'Skip the confirmation prompt'];
+```
+
+`$this->argument('name')` binds by the **declared order** — the first key is the first positional argument — and
+returns `''` when it was not supplied. Asking for an argument the command does not declare throws, because that is a
+bug in the command rather than in what the user typed. `$this->option('port', '8000')` and `$this->hasOption('force')`
+read the named ones.
+
+The parsing rules are few on purpose: `--name=value`, `--name` (an empty-valued flag), the same in short form, and
+`--` to stop parsing so the rest is positional. Everything else is a positional argument.
+
+Declaring an option is also what makes it appear in `tether help <command>`, which is the only reason
+`boilerplate:clear` ever knew about `--force`: before `Input` existed it searched the raw argument list for the
+literal string.
+
+## The introspection commands
+
+`routes`, `explain`, `inspect` and `context` exist because of Principle 6 — a runtime feature is not finished until
+the tooling can show it. They **only report**; none of them changes an application, and none loads an application
+class to look at it (instantiating an Action would run its constructor and build a Domain and a Responder).
+
+They share `Traits\InspectsApplication`, which loads `project_root() . '/routes/web.php'` and flattens the table.
+`Router::match()` exists so they can resolve a URI without a `Request` — building one starts a session and enforces
+CSRF, which is right inside a request and impossible from a terminal.
+
+Where the output links an Action to a Domain and Responder it says **by convention**, and it means it: an Action
+constructs its own in its constructor and may use anything. The commands report what is on disk under the
+conventional name, and mark what is missing.
+
+`context` writes JSON to stdout and nothing else, so it can be piped. Its contract is the done-when for Phase 4 of
+the roadmap — an agent given only that output should be able to say where a new feature's files belong and which
+route would conflict — and `tests/Feature/IntrospectionTest.php` asserts the keys that promise depends on.
 
 ## The console binary
 
@@ -236,8 +309,7 @@ contain classes that are wrong on purpose.
 
 Level 9 is not yet reachable, and the reason is structural rather than cosmetic: `Session::get()` returns `mixed`,
 and `$_SERVER` and `$_POST` enter the framework untyped, so every value derived from them is `mixed` too. Fixing
-that means typing the request/session boundary, which is Phase 2/3 work — do not close the gap with casts or
-`@phpstan-ignore`.
+that means typing the request/session boundary — do not close the gap with casts or `@phpstan-ignore`.
 
 Cover behaviour that consumers depend on: route resolution order (static wins over dynamic), group prefixing, the
 path helpers, CSRF acceptance and rejection, and the stub placeholder contract.

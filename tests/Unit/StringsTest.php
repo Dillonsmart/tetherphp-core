@@ -38,14 +38,6 @@ class StringsTest extends TestCase
         $this->assertSame('SendWelcomeEmail', $this->subject->toPascalCase('SendWelcomeEmail'));
     }
 
-    public function testToValidClassNameMatchesPascalCase(): void
-    {
-        $this->assertSame(
-            $this->subject->toPascalCase('user-profile'),
-            $this->subject->toValidClassName('user-profile')
-        );
-    }
-
     public function testKebabCasesAPascalCasedName(): void
     {
         $this->assertSame('send-welcome-email', $this->subject->toKebabCase('SendWelcomeEmail'));

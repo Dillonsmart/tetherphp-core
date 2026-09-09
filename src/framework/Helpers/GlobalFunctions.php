@@ -52,31 +52,30 @@ function core_views(): string
 }
 
 /**
- * @return mixed whatever the included view returns
+ * The one way application code reads a setting.
+ *
+ * A thin delegate to the Env the Kernel installed at boot — it holds no state
+ * of its own and makes no decision the object does not. A missing key returns
+ * $default; Env::current() throws only if nothing was booted at all, which is a
+ * bug in the boot rather than a missing variable.
  */
-function view(string $view)
+function env(string $key, ?string $default = null): ?string
 {
-    return include views_dir() . '/' . $view . '.php';
+    return \TetherPHP\framework\Modules\Env::current()->get($key, $default);
 }
 
-function env(string $key): ?string
-{
-    $env = \TetherPHP\framework\Modules\Env::getInstance();
-    try {
-        return $env->getEnv($key);
-    } catch (\Exception $e) {
-        // the message, not the exception — logger() takes a string, and an
-        // Exception coerced to one drags its whole stack trace into the log
-        logger($e->getMessage(), 'error');
-        return null;
-    }
-}
-
+/**
+ * The one way application code writes a log line.
+ */
 function logger(string $message, string $level = 'info'): void
 {
+    $log = \TetherPHP\framework\Modules\Log::current();
+
     if ($level === 'error') {
-        \TetherPHP\framework\Modules\Log::error($message);
-    } else {
-        \TetherPHP\framework\Modules\Log::info($message);
+        $log->error($message);
+
+        return;
     }
+
+    $log->info($message);
 }
