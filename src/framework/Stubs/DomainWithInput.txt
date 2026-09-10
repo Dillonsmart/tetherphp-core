@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Domains\{{feature}};
+
+use Domains\Domain;
+use Domains\{{feature}}\Results\{{result}};
+
+class {{operation}} extends Domain
+{
+    /**
+     * What this domain needs arrives through its constructor.
+     *
+     * Not through handle(): the base class declares `handle(): DomainResult`
+     * with no parameters, and PHP will not let an override add a required one.
+     * The Action reads it off the request and hands it over, which is the same
+     * rule the Kernel follows with the Env and the Log.
+     */
+    public function __construct(
+{{domainProperties}}
+    ) {
+    }
+
+    public function handle(): {{result}}
+    {
+        // TODO: {{todo}}
+
+        return new {{result}}({{resultArguments}});
+    }
+}

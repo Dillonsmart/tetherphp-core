@@ -21,6 +21,7 @@
             "TetherPHP\\Tests\\": "tests/",
             "Commands\\": "tests/Fixtures/app/Commands/",
             "TetherPHP\\Tests\\Fixtures\\app\\Actions\\": "tests/Fixtures/app/Actions/",
+            "Domains\\": "tests/Fixtures/app/Domains/",
             "TetherPHP\\Tests\\Fixtures\\app\\Middleware\\": "tests/Fixtures/app/Middleware/"
         }
     },

@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Domains\Results;
+namespace Domains\{{feature}}\Results;
 
 use TetherPHP\framework\Interfaces\DomainResult;
 
 /**
- * What the {{className}} domain returns.
+ * A page of {{feature}}, with no collection and no record behind it.
  *
  * Name these properties for the domain, not for the template. The Responder
  * decides what a view is given, so a variable renamed in a view must never
  * reach back into here.
  */
-final readonly class {{className}} implements DomainResult
+final readonly class {{result}} implements DomainResult
 {
     public function __construct(
         public string $title,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TetherPHP\framework\Traits;
 
 use TetherPHP\framework\Interfaces\ActionInterface;
+use TetherPHP\framework\Interfaces\DomainResult;
 use TetherPHP\framework\Interfaces\MiddlewareInterface;
 use TetherPHP\framework\Modules\Env;
 use TetherPHP\framework\Modules\Log;
@@ -170,30 +171,130 @@ trait InspectsApplication
      * useful — as long as the output says "by convention" and reports what is
      * actually on disk rather than implying the framework resolved it.
      *
-     * @return array<string, array{class: string, exists: bool, file: ?string}>
+     * The whole name after `Actions\` is carried across, not just the last
+     * part of it. Every feature is a namespace, so `Actions\Post\Show` belongs
+     * to `Domains\Post\Show`; matching on the short name alone looked for
+     * `Domains\Show` and reported every action in every feature as missing its
+     * triple.
+     *
+     * @return array<string, array{class: string, exists: bool, file: ?string, declared: bool}>
      */
     protected function triple(string $action): array
     {
-        $short = $this->shortName($action);
+        $name = str_starts_with($action, 'Actions\\')
+            ? substr($action, strlen('Actions\\'))
+            : $this->shortName($action);
 
+        $domain = "Domains\\{$name}";
+
+        // the Action is what the route names, so it is not a guess; the Result
+        // is read off the Domain's own signature where the Domain exists
         $classes = [
-            'action' => $action,
-            'domain' => "Domains\\{$short}",
-            'result' => "Domains\\Results\\{$short}",
-            'responder' => "Responders\\{$short}",
+            'action' => [$action, true],
+            'domain' => [$domain, false],
+            'result' => $this->resultClass($domain, $name),
+            'responder' => ["Responders\\{$name}", false],
         ];
 
         $triple = [];
 
-        foreach ($classes as $role => $class) {
+        foreach ($classes as $role => [$class, $declared]) {
             $triple[$role] = [
                 'class' => $class,
                 'exists' => class_exists($class),
                 'file' => $this->classFile($class),
+                'declared' => $declared,
             ];
         }
 
         return $triple;
+    }
+
+    /**
+     * The Result a Domain returns, read off `handle()` rather than guessed.
+     *
+     * Guessing stopped working when Results became shared by shape. There are
+     * only three answers a CRUD domain gives — many, one, or "I changed this" —
+     * so `Show` and `Edit` both return `Domains\Post\Results\Record` and
+     * there is no `Results\Show` to look for. Predicting one by name would
+     * have reported "(not found)" for every action in every resource.
+     *
+     * Reading the declaration is also simply more honest: it reports what the
+     * code says instead of what the naming implies, which is the standard the
+     * rest of this trait's output is held to. Reflection here inspects a
+     * signature and constructs nothing — the introspection commands must never
+     * instantiate an Action, Domain or Responder, because that runs a
+     * constructor which builds two more objects.
+     *
+     * The conventional names remain the fallback, for a Domain that is missing,
+     * has no `handle()` yet, or returns the `DomainResult` interface itself.
+     *
+     * @return array{0: string, 1: bool} the class, and whether the code declared it
+     */
+    protected function resultClass(string $domain, string $name): array
+    {
+        $declared = $this->declaredResultType($domain);
+
+        if ($declared !== null) {
+            return [$declared, true];
+        }
+
+        return [$this->conventionalResultClass($name), false];
+    }
+
+    private function declaredResultType(string $domain): ?string
+    {
+        if (!class_exists($domain)) {
+            return null;
+        }
+
+        $class = new \ReflectionClass($domain);
+
+        if (!$class->hasMethod('handle')) {
+            return null;
+        }
+
+        $type = $class->getMethod('handle')->getReturnType();
+
+        if (!$type instanceof \ReflectionNamedType || $type->isBuiltin()) {
+            return null;
+        }
+
+        $name = $type->getName();
+
+        // the base class declares the interface; a subclass that has not
+        // narrowed it tells us nothing a reader does not already know
+        return $name === DomainResult::class ? null : $name;
+    }
+
+    /**
+     * Where a Result sits when its Domain cannot say.
+     *
+     * Results are nested under the feature — `Domains\Blog\Results\Page`
+     * beside `Domains\Blog\Index` — so that one feature owns one directory
+     * under `Domains/`. They used to sit in a single top-level bucket, and an
+     * application generated before that changed still has them there.
+     *
+     * The current convention is what gets reported unless the old bucket
+     * actually holds something. Naming the old place for a Result that exists
+     * in neither would send someone to create a file where nothing else lives.
+     */
+    private function conventionalResultClass(string $name): string
+    {
+        $position = strrpos($name, '\\');
+
+        if ($position === false) {
+            // Actions\Home, from before features had a directory each
+            return "Domains\\Results\\{$name}";
+        }
+
+        $feature = substr($name, 0, $position);
+        $operation = substr($name, $position + 1);
+
+        $nested = "Domains\\{$feature}\\Results\\{$operation}";
+        $legacy = "Domains\\Results\\{$name}";
+
+        return !class_exists($nested) && class_exists($legacy) ? $legacy : $nested;
     }
 
     protected function shortName(string $class): string

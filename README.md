@@ -31,17 +31,18 @@ src/
 ├── Router.php          # Route registration, groups, static + dynamic matching
 └── framework/
     ├── Commands/       # Built-in console commands (make:*, routes, explain, inspect, context, serve, test)
+    │                   #   make:resource writes a whole CRUD resource
     ├── Exceptions/     # HttpException and the statuses that subclass it
     ├── Helpers/        # Global functions and the Route view helper
     ├── Http/           # Response
     ├── Interfaces/     # ActionInterface, DomainResult, MiddlewareInterface, RequestInterface, ResponderInterface
-    ├── Middleware/     # VerifyCsrfToken
+    ├── Middleware/     # VerifyCsrfToken, OverridesMethod
     ├── Modules/        # Console, Input, Env, Log
     ├── Requests/       # Request
     ├── Routing/        # Route (the result of matching)
     ├── Sessions/       # Session, CsrfToken
-    ├── Stubs/          # Templates used by the make:* commands
-    ├── Traits/         # Strings, GeneratesFiles, InspectsApplication
+    ├── Stubs/          # Templates used by the make:* commands (one set for features and resources)
+    ├── Traits/         # Strings, GeneratesFiles, GeneratesTriples, InspectsApplication
     └── Views/          # Fallback error views
 tests/
 ├── Feature/            # needs the fixture application

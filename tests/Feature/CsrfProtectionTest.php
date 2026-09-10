@@ -15,6 +15,7 @@ use TetherPHP\framework\Sessions\Session;
 use TetherPHP\Kernel;
 use TetherPHP\Router;
 use TetherPHP\Tests\Fixtures\app\Actions\Greet;
+use TetherPHP\Tests\Fixtures\KernelWithBody;
 
 /**
  * CSRF protection through the seam it now hangs on.
@@ -220,5 +221,62 @@ class CsrfProtectionTest extends TestCase
         $this->kernels[] = $kernel;
 
         $this->assertSame(200, $kernel->run()->status());
+    }
+
+    /**
+     * The token used to be read straight out of `$_POST`, which PHP populates
+     * for a POST body and nothing else — so a form-encoded PUT could never
+     * present one in its body and had to fall back to the header. Now that the
+     * Kernel parses every body, the hidden field works on every verb a form can
+     * ask for, which is what makes an update form work at all.
+     */
+    public function testAFormEncodedPutPresentsItsTokenInTheBody(): void
+    {
+        $token = $this->withToken();
+
+        $_SERVER['REQUEST_METHOD'] = 'PUT';
+        $_SERVER['REQUEST_URI'] = '/contact';
+        $_SERVER['CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+
+        $kernel = new KernelWithBody(
+            $this->router,
+            new Env(['APP_NAME' => 'TetherPHP Tests', 'APP_DEBUG' => 'false']),
+            new Log(sys_get_temp_dir() . '/tether-csrf-test-logs'),
+            [new VerifyCsrfToken($this->session, new Log(sys_get_temp_dir() . '/tether-csrf-test-logs'))],
+        );
+
+        $kernel->requestBody = 'csrf_token=' . urlencode($token) . '&title=Hello';
+        $this->kernels[] = $kernel;
+
+        $response = $kernel->run();
+
+        unset($_SERVER['CONTENT_TYPE']);
+
+        $this->assertSame(200, $response->status());
+    }
+
+    public function testAFormEncodedPutWithTheWrongTokenIsStillRefused(): void
+    {
+        $this->withToken();
+
+        $_SERVER['REQUEST_METHOD'] = 'PUT';
+        $_SERVER['REQUEST_URI'] = '/contact';
+        $_SERVER['CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+
+        $kernel = new KernelWithBody(
+            $this->router,
+            new Env(['APP_NAME' => 'TetherPHP Tests', 'APP_DEBUG' => 'false']),
+            new Log(sys_get_temp_dir() . '/tether-csrf-test-logs'),
+            [new VerifyCsrfToken($this->session, new Log(sys_get_temp_dir() . '/tether-csrf-test-logs'))],
+        );
+
+        $kernel->requestBody = 'csrf_token=not-the-token';
+        $this->kernels[] = $kernel;
+
+        $response = $kernel->run();
+
+        unset($_SERVER['CONTENT_TYPE']);
+
+        $this->assertSame(403, $response->status());
     }
 }

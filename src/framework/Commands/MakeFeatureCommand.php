@@ -4,12 +4,24 @@ declare(strict_types=1);
 
 namespace TetherPHP\framework\Commands;
 
-use TetherPHP\framework\Traits\GeneratesFiles;
+use TetherPHP\framework\Traits\GeneratesTriples;
 use TetherPHP\framework\Traits\Strings;
 
+/**
+ * One feature: one directory, one operation in it.
+ *
+ * This used to write five flat files — `app/Actions/Blog.php`,
+ * `app/Domains/Blog.php` and so on — while `make:resource` wrote a directory
+ * per resource. Two layouts for one concept, and the flat one was a dead end:
+ * the moment a feature needed a second route, four files had to move and four
+ * namespaces had to be rewritten.
+ *
+ * A feature is now a resource with one operation. Add a second route to it with
+ * `make:action Blog Show` and nothing moves.
+ */
 class MakeFeatureCommand extends Command
 {
-    use GeneratesFiles;
+    use GeneratesTriples;
     use Strings;
 
     public string $command = 'make:feature';
@@ -21,19 +33,6 @@ class MakeFeatureCommand extends Command
         'name' => 'The name of the feature',
     ];
 
-    /**
-     * The five files of one feature, in the order they have to exist in.
-     *
-     * This used to be five private methods that each created a directory,
-     * refused to overwrite, read a stub, substituted and reported — the same
-     * six steps with a different path. They are now one list, and the same
-     * writer backs `make:action`, `make:domain` and `make:responder`, so a
-     * feature generated whole and a feature generated a piece at a time cannot
-     * drift apart.
-     *
-     * Order matters: the Domain's return type names the Result, and the
-     * Responder renders the view.
-     */
     public function execute(): int
     {
         $name = $this->argument('name');
@@ -44,29 +43,22 @@ class MakeFeatureCommand extends Command
             return self::COMMAND_INVALID_ARGUMENT;
         }
 
-        $className = $this->toPascalCase($name);
-        $viewName = $this->toKebabCase($className);
+        $feature = $this->toPascalCase($name);
+        $viewName = $this->toKebabCase($feature);
+        $uri = '/' . $viewName;
 
-        $replacements = ['className' => $className, 'viewName' => $viewName];
+        $spec = $this->pageOperation($feature, 'Index', $viewName, 'index');
 
-        $files = [
-            'Result' => app_dir() . "/Domains/Results/{$className}.php",
-            'Domain' => app_dir() . "/Domains/{$className}.php",
-            'Responder' => app_dir() . "/Responders/{$className}.php",
-            'Action' => app_dir() . "/Actions/{$className}.php",
-            'View' => app_dir() . "/Views/pages/{$viewName}/index.php",
-        ];
+        $status = $this->writeTriple($feature, 'Index', $viewName, $uri, $spec);
 
-        foreach ($files as $stub => $path) {
-            $status = $this->writeStub($stub, $path, $replacements);
-
-            if ($status !== self::COMMAND_SUCCESS) {
-                return $status;
-            }
+        if ($status !== self::COMMAND_SUCCESS) {
+            return $status;
         }
 
-        $this->success("Feature '{$className}' created.");
-        $this->info("Route it with: \$router->get('/{$viewName}', Actions\\{$className}::class);");
+        $this->success("Feature '{$feature}' created.");
+        $this->info("Route it with: \$router->get('{$uri}', Actions\\{$feature}\\Index::class);");
+        $this->line();
+        $this->line("Add another page to it with 'tether make:action {$feature} <Operation>'.");
 
         return self::COMMAND_SUCCESS;
     }

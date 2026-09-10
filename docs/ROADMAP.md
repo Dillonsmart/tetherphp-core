@@ -3,7 +3,7 @@
 Taking the framework from working to compliant with its [six core principles](../AGENTS.md#the-six-core-principles).
 Ordered by dependency: Phases 2 and 3 are both breaking and ship together so consumers migrate once.
 
-Current: `v0.8.0`. Target: `v1.0`.
+Current: `v0.10.0`. Target: `v1.0`.
 
 Items struck through below have landed since this roadmap was written.
 
@@ -37,6 +37,10 @@ Read from the current source, not inferred. The principle named is the one the d
 | `toPascalCase()` and `toValidClassName()` | Identical implementations under two names | One Obvious Way |
 | Commands vanish silently | `class_exists()` and `is_subclass_of()` fail closed with no diagnostic | Agent Ready |
 | `Command::argument()` binds by position | `array_search` over `$arguments` keys; reordering silently rebinds. `$opts` is never parsed | Agent Ready |
+| ~~The query string was parsed off and dropped~~ **fixed** | An index page could not paginate, filter or search — the R of CRUD read the path and nothing else | Explicit |
+| ~~The body was read from `$_POST`~~ **fixed** | PHP fills it for a POST and nothing else, so a form-encoded PUT or PATCH arrived empty. The route matched, the Action ran, every field was missing | Human First |
+| ~~`Request` lowercased the URI~~ **fixed** | Routing was case-insensitive because the URI was destroyed, so every captured parameter was lowercased and no resource could be identified by a slug or a UUID | Explicit |
+| ~~PUT, PATCH and DELETE were unreachable from a browser~~ **fixed** | A form sends GET or POST, so three of the five registerable verbs were decorative unless the client spoke JSON | Human First |
 | No introspection commands | Nothing prints the route table, explains a URI, or emits machine-readable context | Tools |
 | No `make:action` / `make:domain` / `make:responder` | `make:feature` generates all three or nothing | Tools |
 | No `declare(strict_types=1)`, partial return types | `MakeFeatureCommand::execute(): int` is typed; `MakeCommand::execute()` is not | Human First |
@@ -124,8 +128,9 @@ themselves from `project_root()` the way `getInstance()` did.
 **Ship with Phase 2** — one migration guide, one upgrade.
 
 **What it did not reach.** PHPStan level 9. `$_SERVER` and `$_POST` still enter `Kernel` untyped and `Session::get()`
-still returns `mixed`, so values derived from them are `mixed` too. Typing that boundary is its own change — it is
-also what would finally expose the query string, which no application can currently read.
+still returns `mixed`, so values derived from them are `mixed` too. Typing that boundary is its own change — ~~it is
+also what would finally expose the query string, which no application can currently read~~ **the query string landed
+in Phase 7**, which found that exposing it did not need the boundary typed after all; level 9 still does.
 
 ## Phase 4 — The CLI becomes the product · `v0.8.0` — **done**
 
@@ -214,8 +219,77 @@ Both remaining items are decisions rather than refactors. Documentation generati
 `Router`, `Kernel`, `MiddlewareInterface` and the console's own output are being promised, and the seam is one
 release old.
 
+**The freeze waits on Phase 7.** `Request` is one of the classes 1.0 would be promising and it was missing two of
+its three sources of input, so promising it as it stood would have frozen the gap in.
+
 **Done when** `composer create-project dillonsmart/tetherphp` yields an application with nothing in it that a
 developer must first delete.
+
+## Phase 7 — Full CRUD · `v0.10.0` — **done**
+
+Not in the original plan, and it should have been. The framework could register five verbs and route to them, and
+called that routing done — but a resource is not routes, it is routes plus the input they carry, and three of the
+four letters were missing something:
+
+| | Worked | Did not |
+| --- | --- | --- |
+| **C**reate | `POST` with `$_POST`, or JSON | — |
+| **R**ead | the path | the query string, so no paging, filtering or search; any id with a capital in it |
+| **U**pdate | JSON over PUT/PATCH | a form-encoded body, and reaching PUT from a browser at all |
+| **D**elete | JSON over DELETE | reaching DELETE from a browser at all |
+
+Each of them looked like it worked. A `put()` route registered, matched and ran its Action — and the Action found an
+empty payload, because PHP populates `$_POST` for a POST body and nothing else and the Kernel read `$_POST`. That is
+the worst shape a defect can have: no error, no log line, just a field that is not there.
+
+- ~~The query string reaches the Action.~~ **done** — `$request->query`, parsed from `REQUEST_URI` alongside the
+  path so the two cannot disagree. The Kernel had been splitting it off since `v0.3.4` and dropping it.
+- ~~The body is parsed for every verb.~~ **done** — JSON, then `$_POST` where PHP has filled it (the only thing that
+  can read a multipart body, so uploads survive), then a form-encoded body parsed from the stream.
+- ~~The body is built before middleware runs.~~ **done** — it was assigned during dispatch, after every middleware
+  had been and gone, and `$request->payload` was a typed property with no default, so reading it early was a fatal
+  rather than an empty array.
+- ~~Route parameters keep the case they were sent with.~~ **done** — `Request` lowercased the whole URI through a
+  property hook to make matching case-insensitive. `Router::match()` compares case-insensitively instead and
+  captures segments verbatim, so `/posts/{slug}` and `/users/{uuid}` work.
+- ~~A browser form can reach PUT, PATCH and DELETE.~~ **done** — `Middleware\OverridesMethod`, opt-in, reading
+  `_method` from the body of a POST. It is the one piece of behaviour triggered by a magic field name, which is why
+  it hangs on the seam rather than living in the Kernel: composed in it is visible in `routes/middleware.php` and in
+  `tether routes` and `tether explain`; left out, `_method` means nothing.
+- ~~The CSRF token is read from the request rather than `$_POST`.~~ **done** — so the hidden field authorises every
+  verb a form can ask for, and the last superglobal is out of a framework class.
+- ~~`tether make:resource`.~~ **done** — seven Actions, Domains and Responders, three shared Results and four
+  views, and it prints the seven route lines rather than writing them.
+- ~~One layout for features and resources.~~ **done** — `make:resource` shipped nesting each resource in a
+  directory while `make:feature` still wrote flat files, which was two layouts for one concept and a Principle 4
+  failure introduced by the same change that fixed the others. Every feature is a directory now, both commands share
+  one set of stubs through `Traits\GeneratesTriples`, and `make:action`/`make:domain`/`make:responder` take the
+  operation as a second argument. The flat layout was also a dead end: a feature that needed a second route cost
+  four moved files and four rewritten namespaces, where it now costs one command and moves nothing. Results moved
+  under the feature at the same time, so a feature owns one directory under `Domains/` rather than two.
+- ~~Results named for their shape rather than per operation.~~ **done** — a resource generated seven Result classes
+  of which four differed from another only by their class name: `Show` and `Edit` returned the same thing, and so
+  did all three writes. There are three answers a CRUD domain gives — `Collection`, `Record`, `Written` — plus
+  `Page` for a feature that is neither, and operations now share them. That took `make:resource` from 32 files to
+  28, and cost the introspection commands their ability to find a Result by name, so `triple()` reads it off
+  `Domain::handle()`'s declared return type instead. Which is what it should always have done: the output is meant
+  to report what is on disk, and this is the one part of a triple the code states outright.
+
+**Done when** a resource can be created, listed, filtered, shown, edited, updated and deleted from a browser form
+with no framework file edited and no URI re-parsed by hand. `tests/Feature/CrudTest.php` sends all seven.
+
+**What it deliberately did not add.** A `$router->resource()` registering seven routes from one line — the route
+table is the one file a reader must be able to trust, and Principle 3 forbids putting it somewhere they cannot see
+it. A pluraliser, so that `make:resource Post` guesses `/posts` — a table of English irregulars that will be wrong
+about the one word an application cares about; `--uri` says it once instead. And a `$request->input()` accessor over
+the three input arrays, which would be a second way to read the same value and would hide which of the three it came
+from.
+
+**The tension it settled.** `OverridesMethod` is magic by any honest reading — a hidden field named `_method`
+changing what a request *is*. Principle 3 does not say "never"; it says "if something matters, make it visible". The
+seam is what makes it visible: it is a line in a file listing what a request passes through, and two commands print
+it. Welded into the Kernel it would have been folklore. This is the pattern to reuse the next time something has to
+be magic.
 
 ## Sequencing notes
 

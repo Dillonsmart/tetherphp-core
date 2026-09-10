@@ -168,4 +168,63 @@ class RouterTest extends TestCase
 
         $this->assertFalse($route->matched);
     }
+
+    /**
+     * Matching ignores case without rewriting the URI.
+     *
+     * Case-insensitivity used to come from Request lowercasing the URI on the
+     * way in, which lowercased everything captured out of it too. The Router
+     * compares case-insensitively instead, so `/Posts/My-Slug` matches
+     * `/posts/{slug}` and the slug survives.
+     */
+    public function testAStaticRouteMatchesRegardlessOfCase(): void
+    {
+        $router = new Router();
+        $router->get('/posts', 'Actions\Index');
+
+        $this->assertTrue($router->match('GET', '/POSTS')->matched);
+        $this->assertTrue($router->match('GET', '/Posts')->matched);
+    }
+
+    public function testADynamicRouteMatchesRegardlessOfCase(): void
+    {
+        $router = new Router();
+        $router->get('/posts/{slug}', 'Actions\Show');
+
+        $this->assertTrue($router->match('GET', '/POSTS/anything')->matched);
+    }
+
+    public function testACapturedParameterKeepsTheCaseItWasSentWith(): void
+    {
+        $router = new Router();
+        $router->get('/posts/{slug}', 'Actions\Show');
+
+        $this->assertSame(['slug' => 'My-First-Post'], $router->match('GET', '/posts/My-First-Post')->params);
+    }
+
+    public function testACapturedUuidIsNotLowercased(): void
+    {
+        $router = new Router();
+        $router->get('/users/{uuid}', 'Actions\Show');
+
+        $uuid = '3F2504E0-4F89-11D3-9A0C-0305E82C3301';
+
+        $this->assertSame($uuid, $router->match('GET', "/users/{$uuid}")->params['uuid']);
+    }
+
+    /**
+     * The seven routes of a resource include a static segment that would also
+     * satisfy the dynamic one. `/posts/create` must be the create form, not a
+     * post whose id is the word "create", whichever order they were registered
+     * in.
+     */
+    public function testAStaticRouteWinsOverADynamicOneRegisteredBeforeIt(): void
+    {
+        $router = new Router();
+        $router->get('/posts/{id}', 'Actions\Show');
+        $router->get('/posts/create', 'Actions\Create');
+
+        $this->assertSame('Actions\Create', $router->match('GET', '/posts/create')->action);
+        $this->assertSame('Actions\Show', $router->match('GET', '/posts/12')->action);
+    }
 }

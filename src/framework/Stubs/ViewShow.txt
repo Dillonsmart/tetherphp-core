@@ -1,0 +1,16 @@
+<h1>{{feature}} <?php echo htmlspecialchars($id); ?></h1>
+
+<dl>
+    <?php foreach ($attributes as $name => $value): ?>
+        <dt><?php echo htmlspecialchars((string) $name); ?></dt>
+        <dd><?php echo htmlspecialchars((string) $value); ?></dd>
+    <?php endforeach; ?>
+</dl>
+
+<p><a href="{{uri}}/<?php echo htmlspecialchars($id); ?>/edit">Edit</a></p>
+
+<form method="post" action="{{uri}}/<?php echo htmlspecialchars($id); ?>">
+    <input type="hidden" name="_method" value="DELETE">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
+    <button type="submit">Delete</button>
+</form>

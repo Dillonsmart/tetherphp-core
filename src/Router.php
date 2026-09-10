@@ -132,15 +132,24 @@ class Router
      * right thing inside a request and impossible from the console. `tether
      * explain` asks this question without being a request, and so can a test.
      *
-     * The URI is matched exactly as given: Request lowercases it through a
-     * property hook, so a caller outside a request has to do the same.
+     * Matching is case-insensitive and the URI is compared as given. It used to
+     * be case-insensitive because Request lowercased the URI on the way in,
+     * which also lowercased every parameter captured out of it — so `/posts/{slug}`
+     * could never carry a slug with a capital in it, and `/users/{uuid}` was
+     * broken for half the UUIDs there are. The comparison is what ignores case
+     * now; nothing rewrites the request.
+     *
+     * A static route still wins over a dynamic route of the same shape, which
+     * is why they are looked at in two passes rather than one.
      */
     public function match(string $method, string $uri): Route
     {
         $routes = $this->routesFor($method);
 
-        if (array_key_exists($uri, $routes)) {
-            return Route::to($routes[$uri]['action'], $routes[$uri]['type']);
+        foreach ($routes as $pattern => $route) {
+            if ($route['type'] !== Route::TYPE_DYNAMIC && strcasecmp($pattern, $uri) === 0) {
+                return Route::to($route['action'], $route['type']);
+            }
         }
 
         foreach ($routes as $pattern => $route) {
@@ -176,11 +185,13 @@ class Router
 
         foreach ($parts as $index => $part) {
             if (str_starts_with($part, '{') && str_ends_with($part, '}')) {
+                // captured verbatim: the segment is the application's data, not
+                // something for the router to normalise
                 $params[trim($part, '{}')] = $requestParts[$index];
                 continue;
             }
 
-            if ($part !== $requestParts[$index]) {
+            if (strcasecmp($part, $requestParts[$index]) !== 0) {
                 return null;
             }
         }

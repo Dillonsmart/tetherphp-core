@@ -104,6 +104,8 @@ class Kernel
             $this->requestMethod(),
             $this->requestPath(),
             microtime(true),
+            $this->payload(),
+            $this->requestQuery(),
         );
 
         return $this->through($this->respond(...))($this->request);
@@ -168,7 +170,6 @@ class Kernel
         }
 
         $request->params = $route->params;
-        $request->payload = $this->payload();
 
         if ($route->isView()) {
             return Response::html($this->renderView($route->action));
@@ -215,20 +216,58 @@ class Kernel
     }
 
     /**
+     * The request body, parsed.
+     *
+     * This used to be `$_POST` with a JSON special case, which quietly limited
+     * the framework to the C and part of the R of CRUD: PHP populates `$_POST`
+     * for a POST body and for nothing else, so a form-encoded PUT, PATCH or
+     * DELETE — an update or a delete sent by anything other than a JSON client
+     * — arrived as an empty array. The route matched, the Action ran, and the
+     * fields were simply not there.
+     *
+     * `$_POST` is still preferred where PHP has filled it, because it is the
+     * only thing that can read a multipart body: `php://input` is empty for
+     * multipart/form-data, so parsing by hand would lose file uploads.
+     *
      * @return array<string, mixed>
      */
     private function payload(): array
     {
         // CONTENT_TYPE is absent on any request without a body, which is most of them
         $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+        $contentType = is_string($contentType) ? $contentType : '';
 
-        if (is_string($contentType) && str_contains($contentType, 'application/json')) {
-            $decoded = json_decode(file_get_contents('php://input') ?: '', true);
+        if (str_contains($contentType, 'application/json')) {
+            $decoded = json_decode($this->body(), true);
 
             return is_array($decoded) ? $decoded : [];
         }
 
-        return $_POST;
+        if ($_POST !== []) {
+            return $_POST;
+        }
+
+        if (str_contains($contentType, 'application/x-www-form-urlencoded')) {
+            parse_str($this->body(), $parsed);
+
+            return $this->withStringKeys($parsed);
+        }
+
+        return [];
+    }
+
+    /**
+     * The raw request body.
+     *
+     * Read through one method so the two parsers above cannot disagree about
+     * what "the body" is, and protected because it is the one input a test
+     * cannot arrange: $_SERVER and $_POST are globals a test can set, and
+     * `php://input` under the CLI is always empty. A test that needs to send a
+     * form-encoded PUT overrides this; nothing else should.
+     */
+    protected function body(): string
+    {
+        return file_get_contents('php://input') ?: '';
     }
 
     /**
@@ -306,6 +345,63 @@ class Kernel
         $path = parse_url($uri, PHP_URL_PATH);
 
         return is_string($path) && $path !== '' ? $path : '/';
+    }
+
+    /**
+     * The query string, parsed.
+     *
+     * requestPath() has always split this off so that `/posts?page=2` could
+     * match the route `/posts`, and then thrown it away — which is why the
+     * roadmap lists the query string as something "no application can currently
+     * read". Both halves of REQUEST_URI now reach the Request.
+     *
+     * Parsed from REQUEST_URI rather than read from `$_GET` so that the path
+     * and the query come from one source. A test that sets REQUEST_URI gets a
+     * request that is consistent with itself.
+     *
+     * @return array<string, mixed>
+     */
+    private function requestQuery(): array
+    {
+        $uri = $_SERVER['REQUEST_URI'] ?? '';
+
+        if (!is_string($uri) || $uri === '') {
+            return [];
+        }
+
+        $queryString = parse_url($uri, PHP_URL_QUERY);
+
+        if (!is_string($queryString) || $queryString === '') {
+            return [];
+        }
+
+        parse_str($queryString, $query);
+
+        return $this->withStringKeys($query);
+    }
+
+    /**
+     * parse_str() hands back an int key for a field named with a number —
+     * `0=yes` — where a Request promises `array<string, mixed>`.
+     *
+     * The keys are cast rather than the promise widened. A field name is a
+     * string in the request that carried it, and `$request->payload['12']`
+     * missing a value that `$request->payload[12]` would have found is exactly
+     * the kind of thing nobody debugs twice.
+     *
+     * @param array<array-key, mixed> $values
+     *
+     * @return array<string, mixed>
+     */
+    private function withStringKeys(array $values): array
+    {
+        $normalised = [];
+
+        foreach ($values as $key => $value) {
+            $normalised[(string) $key] = $value;
+        }
+
+        return $normalised;
     }
 
     /**

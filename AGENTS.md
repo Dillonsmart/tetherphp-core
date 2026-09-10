@@ -74,13 +74,76 @@ run in is the order it is written in the application's `routes/middleware.php`.
 list to report what runs around a request, so a constructor that opens a connection or starts a session does it from
 a terminal too. `Session` starts lazily for exactly this reason.
 
-The framework starts **no session** and checks **no CSRF token** on its own. Both used to be welded into the Kernel
-constructor, and CSRF was validated inside `Request::__construct()`; an application composes
-`Middleware\VerifyCsrfToken` in if it wants them. This is the seam Principle 5 depends on — before it existed there
+The framework starts **no session**, checks **no CSRF token** and honours **no `_method` field** on its own. All
+three used to be welded into the Kernel constructor or into `Request::__construct()`; an application composes
+`Middleware\VerifyCsrfToken` and `Middleware\OverridesMethod` in if it wants them. This is the seam Principle 5 depends on — before it existed there
 was nowhere for a package to attach, so "extra functionality composes in as packages" was not true of anything.
 
 See [`docs/agents/framework.md`](docs/agents/framework.md#middleware-the-composition-seam) for the two design
 decisions behind it and the known tooling gap.
+
+## A request carries three kinds of input
+
+`$request->params` from the path, `$request->query` from the query string, `$request->payload` from the body. Each
+is a plain public array, read with `??`:
+
+```php
+$id    = $request->params['id'] ?? '';
+$page  = $request->query['page'] ?? '1';
+$title = $request->payload['title'] ?? '';
+```
+
+There is deliberately **no `input()` accessor** over the top of them: it would be a second way to read the same
+value and would hide which of the three it came from. Adding one is a review failure.
+
+Two rules the Kernel keeps so those arrays can be trusted:
+
+- **All three are populated before any middleware runs.** `payload` used to be assigned during dispatch, after every
+  middleware had been and gone.
+- **Nothing normalises the URI.** Matching is case-insensitive because `Router::match()` compares that way, not
+  because `Request` lowercases anything. It used to, and every parameter captured out of a lowercased URI was
+  lowercased too — so a slug or a UUID could not be routed. Do not put normalisation back on `Request`.
+
+## Every feature is a directory
+
+```
+app/Actions/Blog/Index.php              Actions\Blog\Index
+app/Domains/Blog/Index.php              Domains\Blog\Index
+app/Domains/Blog/Results/Page.php       Domains\Blog\Results\Page
+app/Responders/Blog/Index.php           Responders\Blog\Index
+app/Views/pages/blog/index.php
+```
+
+`make:feature` and `make:resource` write the same layout and share the same stubs; the resource just writes seven
+operations into the directory instead of one. **A feature grows by addition** — `make:action Blog Show` puts a
+second operation beside the first and touches nothing.
+
+Features used to be flat (`app/Actions/Blog.php`) while resources nested, which was two layouts for one concept and
+made the second route a feature ever needed cost four moved files and four rewritten namespaces. The views were
+always nested; only the classes disagreed.
+
+A Result lives with its Domain, under the feature, so one feature owns one directory under `Domains/`. Actions,
+Domains and Responders are named for the operation; **a Result is named for its shape and shared** by every
+operation that answers the same way — `Collection` for many, `Record` for one, `Written` for a write that redirects,
+`Page` for a page with neither behind it. Naming one per operation produced classes differing from each other by
+their class name and nothing else.
+
+Because they are shared, **`triple()` reads the Result off `Domain::handle()`'s return type** rather than predicting
+it from the Action's name — there is no `Results\Show` to predict. Reflection reads a signature and constructs
+nothing, so the rule that introspection never instantiates an Action, Domain or Responder still holds. Each part of
+a triple carries a `declared` flag saying whether the code stated it or the command guessed.
+
+`Traits\GeneratesTriples` holds the layout, the seven-operation table and the writers. All five `make:*` triple
+commands are thin shells over it — read the trait before changing any of them. Which shape you get is predictable
+from the command: `make:resource` writes the CRUD shapes, every other generator writes the page shape.
+
+## Full CRUD is Phase 7
+
+`tether make:resource <Name>` writes the seven ADR triples of a resource and prints the seven routes for
+`routes/web.php` — it never edits the route table itself, and there is no `$router->resource()`. A browser form
+reaches PUT, PATCH and DELETE through `Middleware\OverridesMethod`, which is opt-in for the reason above: it is the
+one thing in the framework triggered by a magic field name, so it lives where a reader and `tether routes` can both
+see it.
 
 ## Where a change belongs
 

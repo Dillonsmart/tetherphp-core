@@ -1,0 +1,34 @@
+<h1><?php echo $id === '' ? 'New {{feature}}' : 'Edit {{feature}} ' . htmlspecialchars($id); ?></h1>
+
+<?php
+/*
+ * One form for both create and edit. A browser form can only send GET or POST,
+ * so an update declares the verb it means in _method and Middleware\OverridesMethod
+ * turns the POST into a PUT before routing. Leave that middleware out of
+ * routes/middleware.php and this form posts to a route that does not exist.
+ */
+$action = $id === '' ? '{{uri}}' : '{{uri}}/' . $id;
+?>
+
+<form method="post" action="<?php echo htmlspecialchars($action); ?>">
+    <?php if ($id !== ''): ?>
+        <input type="hidden" name="_method" value="PUT">
+    <?php endif; ?>
+
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
+
+    <?php foreach ($attributes as $name => $value): ?>
+        <p>
+            <label for="<?php echo htmlspecialchars((string) $name); ?>">
+                <?php echo htmlspecialchars((string) $name); ?>
+            </label>
+            <input
+                id="<?php echo htmlspecialchars((string) $name); ?>"
+                name="<?php echo htmlspecialchars((string) $name); ?>"
+                value="<?php echo htmlspecialchars((string) $value); ?>"
+            >
+        </p>
+    <?php endforeach; ?>
+
+    <button type="submit">Save</button>
+</form>

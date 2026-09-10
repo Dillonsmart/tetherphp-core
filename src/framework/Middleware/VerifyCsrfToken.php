@@ -58,7 +58,7 @@ final class VerifyCsrfToken implements MiddlewareInterface
     {
         new CsrfToken($this->session);
 
-        if ($request->isWrite() && !$this->presentedAValidToken()) {
+        if ($request->isWrite() && !$this->presentedAValidToken($request)) {
             // a rejected write is a client error, not a server one
             $this->log->error("Rejected {$request->method} {$request->uri}: invalid CSRF token");
 
@@ -68,10 +68,10 @@ final class VerifyCsrfToken implements MiddlewareInterface
         return $next($request);
     }
 
-    private function presentedAValidToken(): bool
+    private function presentedAValidToken(Request $request): bool
     {
         $expected = $this->session->get('csrf_token');
-        $presented = $this->presentedToken();
+        $presented = $this->presentedToken($request);
 
         // a request made against a session that never had a token generated is
         // rejected the same way a mismatched one is; it must not be able to
@@ -82,14 +82,21 @@ final class VerifyCsrfToken implements MiddlewareInterface
     }
 
     /**
-     * PHP only populates $_POST for POST bodies, so reading the token from
-     * there alone made PUT, PATCH and DELETE impossible to authorise — they
-     * could never present a token and so always failed. The header is how
-     * those methods, and fetch/XHR clients generally, send it.
+     * The token comes from the parsed body, or from the header.
+     *
+     * This read `$_POST` directly, which PHP only populates for a POST body —
+     * so a PUT, PATCH or DELETE could never present a token in its body and
+     * had to use the header. The Kernel parses every body now, whatever the
+     * verb and whether it is a form or JSON, so the field works everywhere the
+     * header does. Reading the Request rather than a superglobal also takes the
+     * last piece of ambient state out of a framework class.
+     *
+     * The header stays: it is how fetch and XHR clients send it, and how a
+     * multipart upload sends it without a hidden field.
      */
-    private function presentedToken(): ?string
+    private function presentedToken(Request $request): ?string
     {
-        $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+        $token = $request->payload['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
 
         return is_string($token) ? $token : null;
     }

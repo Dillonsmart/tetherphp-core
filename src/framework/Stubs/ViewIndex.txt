@@ -1,0 +1,23 @@
+<h1>{{feature}}</h1>
+
+<p><a href="{{uri}}/create">New {{feature}}</a></p>
+
+<?php if ($records === []): ?>
+    <p>Nothing here yet.</p>
+<?php else: ?>
+    <ul>
+        <?php foreach ($records as $record): ?>
+            <li>
+                <a href="{{uri}}/<?php echo htmlspecialchars((string) ($record['id'] ?? '')); ?>">
+                    <?php echo htmlspecialchars((string) ($record['id'] ?? '')); ?>
+                </a>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+<?php endif; ?>
+
+<p>
+    <code>$records</code> and <code>$query</code> are named by
+    <code>Responders\{{feature}}\{{operation}}</code>. <code>$query</code> is the parsed
+    query string, so this is where paging and filtering read their input from.
+</p>

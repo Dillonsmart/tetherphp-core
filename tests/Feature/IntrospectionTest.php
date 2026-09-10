@@ -94,22 +94,31 @@ class IntrospectionTest extends TestCase
     }
 
     /**
-     * Request lowercases the URI through a property hook, so explaining
-     * /GREET/ADA has to describe the request that would actually be made.
+     * Matching ignores case; the URI is not rewritten to achieve it.
+     *
+     * Explain used to lowercase the URI before resolving it, because Request
+     * did — and a parameter captured out of a lowercased URI is a lowercased
+     * parameter, which is why a slug or a UUID could not be routed. What the
+     * command prints has to be the request that will actually be made.
      */
-    public function testExplainLowercasesTheUriTheWayARequestDoes(): void
+    public function testExplainResolvesTheUriAsSentAndKeepsParameterCase(): void
     {
-        $output = $this->capture(ExplainCommand::class, '/GREET/ADA');
+        $output = $this->capture(ExplainCommand::class, '/GREET/Ada');
 
-        $this->assertStringContainsString('/greet/ada', $output);
-        $this->assertStringContainsString("params['name'] = 'ada'", $output);
+        $this->assertStringContainsString('/GREET/Ada', $output);
+        $this->assertStringContainsString("params['name'] = 'Ada'", $output);
     }
 
-    public function testExplainDropsTheQueryStringBeforeMatching(): void
+    /**
+     * The query string is not matched on and is no longer thrown away, so the
+     * command shows what the Action will receive rather than saying it is gone.
+     */
+    public function testExplainShowsTheQueryStringTheActionWillReceive(): void
     {
         $output = $this->capture(ExplainCommand::class, '/greet?utm_source=x');
 
-        $this->assertStringContainsString('query string dropped', $output);
+        $this->assertStringContainsString('not matched on', $output);
+        $this->assertStringContainsString("query['utm_source'] = 'x'", $output);
         $this->assertStringContainsString('static', $output);
     }
 

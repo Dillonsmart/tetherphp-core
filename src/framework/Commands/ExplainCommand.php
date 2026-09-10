@@ -59,16 +59,15 @@ class ExplainCommand extends Command
 
         $method = strtoupper((string) $this->option('method', 'GET'));
 
-        // Request lowercases the URI through a property hook, so routing is
-        // case-insensitive and captured parameters arrive lowercased. Resolving
-        // any other way here would explain a request that cannot happen.
-        $path = strtolower(parse_url($uri, PHP_URL_PATH) ?: $uri);
+        // the Kernel splits REQUEST_URI the same way: the path is what routing
+        // sees, the query string reaches the Action as $request->query. Neither
+        // is lowercased — the Router compares case-insensitively instead, so
+        // resolving the URI as given here explains the request that will happen.
+        $path = parse_url($uri, PHP_URL_PATH) ?: $uri;
 
         $this->info($this->label('Request') . "{$method} {$path}");
 
-        if ($path !== strtolower($uri)) {
-            $this->line($this->label('') . 'query string dropped before matching');
-        }
+        $this->explainQuery($uri);
 
         $this->explainMiddleware();
 
@@ -96,6 +95,31 @@ class ExplainCommand extends Command
         }
 
         return $this->explainAction($route->action);
+    }
+
+    /**
+     * The query string is not routed on, but it is not dropped either.
+     *
+     * It used to be: the Kernel parsed it off REQUEST_URI so `/posts?page=2`
+     * could match `/posts`, and then threw it away, so an index page could not
+     * paginate. Showing what an Action would receive is the difference between
+     * "matching ignores this" and "this is gone".
+     */
+    private function explainQuery(string $uri): void
+    {
+        $queryString = parse_url($uri, PHP_URL_QUERY);
+
+        if (!is_string($queryString) || $queryString === '') {
+            return;
+        }
+
+        parse_str($queryString, $query);
+
+        $this->line($this->label('') . 'the query string is not matched on, and reaches the Action as:');
+
+        foreach ($query as $name => $value) {
+            $this->line($this->label('') . "\$this->request->query['{$name}'] = " . (is_string($value) ? "'{$value}'" : gettype($value)));
+        }
     }
 
     /**
@@ -182,8 +206,14 @@ class ExplainCommand extends Command
         $this->line();
         $this->line($this->label('Response') . 'whatever the Responder returns; public/index.php calls send() on it.');
         $this->line();
-        $this->line('Domain, Result and Responder are matched to the Action by name. An Action builds');
-        $this->line('its own in its constructor and may use others — read the Action to be certain.');
+        $this->line('Domain and Responder are matched to the Action by name. An Action builds its own');
+        $this->line('in its constructor and may use others — read the Action to be certain.');
+
+        // the Result is the one part that is not a guess where the Domain
+        // exists: it is read off what handle() declares it returns
+        $this->line($triple['result']['declared']
+            ? "The Result is not a guess — it is the return type Domain::handle() declares."
+            : "The Result is a convention too; no Domain was found to read a return type from.");
 
         return self::COMMAND_SUCCESS;
     }

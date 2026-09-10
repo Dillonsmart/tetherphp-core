@@ -173,14 +173,19 @@ class InspectCommand extends Command
     private function triples(string $action): void
     {
         $this->line();
-        $this->line('By convention');
+        $this->line('Its triple');
 
         foreach ($this->triple($action) as $role => $part) {
             if ($role === 'action') {
                 continue;
             }
 
-            $this->line(sprintf('          %-10s %s%s', $role, $part['class'], $part['exists'] ? '' : "  \033[31m(not found)\033[0m"));
+            $note = $part['exists'] ? '' : "  \033[31m(not found)\033[0m";
+
+            // say which of these the code states and which this command guessed
+            $note .= $part['declared'] ? '  (declared)' : '  (by convention)';
+
+            $this->line(sprintf('          %-10s %s%s', $role, $part['class'], $note));
         }
     }
 }

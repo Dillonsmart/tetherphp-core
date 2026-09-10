@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Responders\{{feature}};
+
+use Domains\{{feature}}\Results\{{result}};
+use Responders\Responder;
+use TetherPHP\framework\Http\Response;
+
+class {{operation}} extends Responder
+{
+    /**
+     * The one place this page's view variables are named. Everything the
+     * template reads is decided here, out of a result the domain owns.
+     */
+    public function __invoke({{result}} $result): Response
+    {
+        return $this->view('pages.{{viewName}}.{{page}}', [
+            'title' => $result->title,
+        ]);
+    }
+}

@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Domains;
+namespace Domains\{{feature}};
 
-use Domains\Results\{{className}} as {{className}}Result;
+use Domains\Domain;
+use Domains\{{feature}}\Results\{{result}};
 
-class {{className}} extends Domain
+class {{operation}} extends Domain
 {
-    public function handle(): {{className}}Result
+    public function handle(): {{result}}
     {
-        return new {{className}}Result('{{className}}');
+        // TODO: {{todo}}
+
+        return new {{result}}({{resultArguments}});
     }
 }

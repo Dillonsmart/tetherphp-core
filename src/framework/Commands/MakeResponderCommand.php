@@ -4,63 +4,58 @@ declare(strict_types=1);
 
 namespace TetherPHP\framework\Commands;
 
-use TetherPHP\framework\Traits\GeneratesFiles;
+use TetherPHP\framework\Traits\GeneratesTriples;
 use TetherPHP\framework\Traits\Strings;
 
 class MakeResponderCommand extends Command
 {
-    use GeneratesFiles;
+    use GeneratesTriples;
     use Strings;
 
     public string $command = 'make:responder';
 
-    public string $description = 'Create a Responder and the view it renders';
+    public string $description = 'Create a Responder inside a feature, and the view it renders';
 
     /** @var array<string, string> */
     protected array $arguments = [
-        'name' => 'The name of the responder',
+        'feature' => 'The feature the responder belongs to, e.g. Blog',
+        'operation' => 'What the responder renders, e.g. Show (default: Index)',
     ];
 
     /**
      * The view comes with it: the generated Responder renders
-     * `pages.<name>.index`, so shipping one without the other produces code
-     * that throws "View not found" on first request.
+     * `pages.<feature>.<operation>`, so shipping one without the other produces
+     * code that throws "View not found" on first request.
      */
     public function execute(): int
     {
-        $name = $this->argument('name');
+        $feature = $this->argument('feature');
 
-        if ($name === '') {
-            $this->error('Responder name cannot be empty.');
+        if ($feature === '') {
+            $this->error('Feature name cannot be empty.');
 
             return self::COMMAND_INVALID_ARGUMENT;
         }
 
-        $className = $this->toPascalCase($name);
-        $viewName = $this->toKebabCase($className);
+        $feature = $this->toPascalCase($feature);
+        $operation = $this->toPascalCase($this->argument('operation') ?: 'Index');
+        $viewName = $this->toKebabCase($feature);
+        $page = $this->toKebabCase($operation);
 
-        $status = $this->writeStub('Responder', app_dir() . "/Responders/{$className}.php", [
-            'className' => $className,
-            'viewName' => $viewName,
-        ]);
+        $spec = $this->pageOperation($feature, $operation, $viewName, $page);
 
-        if ($status !== self::COMMAND_SUCCESS) {
-            return $status;
-        }
-
-        $status = $this->writeStub('View', app_dir() . "/Views/pages/{$viewName}/index.php", [
-            'className' => $className,
-            'viewName' => $viewName,
-        ]);
+        $status = $this->writeResponder($feature, $operation, $viewName, '/' . $viewName, $spec);
 
         if ($status !== self::COMMAND_SUCCESS) {
             return $status;
         }
+
+        $shape = $this->resultShape($spec['result']);
 
         $this->warnIfMissing(
-            "Domains\\Results\\{$className}",
-            app_dir() . "/Domains/Results/{$className}.php",
-            "make:domain {$name}",
+            "Domains\\{$feature}\\Results\\{$shape}",
+            app_dir() . "/Domains/{$feature}/Results/{$shape}.php",
+            "make:domain {$feature} {$operation}",
         );
 
         return self::COMMAND_SUCCESS;

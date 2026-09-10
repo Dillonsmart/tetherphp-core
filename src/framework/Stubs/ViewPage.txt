@@ -1,0 +1,11 @@
+<h1><?php echo htmlspecialchars($title); ?></h1>
+
+<p>
+    This view is <code>app/Views/pages/{{viewName}}/{{page}}.php</code>, rendered by
+    the <code>Responders\{{feature}}\{{operation}}</code> responder.
+</p>
+
+<p>
+    <code>$title</code> is named by that responder, out of the
+    <code>Domains\{{feature}}\Results\{{operation}}</code> the domain returned.
+</p>

@@ -60,6 +60,31 @@ trait GeneratesFiles
     }
 
     /**
+     * Renders a stub only if the file is not already there.
+     *
+     * `writeStub()` treats an existing file as an error, which is right for a
+     * class one command owns: silently replacing an Action someone has edited
+     * would be the worst thing a generator could do. Results are shared by
+     * shape — every operation that answers with a list returns the same
+     * `Results\Collection` — so for those, finding one already written is the
+     * normal case and not a failure.
+     *
+     * @param array<string, string> $replacements placeholder => value, without the braces
+     *
+     * @return int one of the COMMAND_* constants
+     */
+    protected function writeSharedStub(string $stub, string $path, array $replacements): int
+    {
+        if (file_exists($path)) {
+            $this->info("Reusing: {$path}");
+
+            return self::COMMAND_SUCCESS;
+        }
+
+        return $this->writeStub($stub, $path, $replacements);
+    }
+
+    /**
      * Says so when a generated class references something that is not there yet.
      *
      * An Action names its Domain and Responder in its constructor, so

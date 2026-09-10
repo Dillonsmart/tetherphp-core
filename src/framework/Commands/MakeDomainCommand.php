@@ -4,21 +4,22 @@ declare(strict_types=1);
 
 namespace TetherPHP\framework\Commands;
 
-use TetherPHP\framework\Traits\GeneratesFiles;
+use TetherPHP\framework\Traits\GeneratesTriples;
 use TetherPHP\framework\Traits\Strings;
 
 class MakeDomainCommand extends Command
 {
-    use GeneratesFiles;
+    use GeneratesTriples;
     use Strings;
 
     public string $command = 'make:domain';
 
-    public string $description = 'Create a Domain and the Result it returns';
+    public string $description = 'Create a Domain inside a feature, and the Result it returns';
 
     /** @var array<string, string> */
     protected array $arguments = [
-        'name' => 'The name of the domain',
+        'feature' => 'The feature the domain belongs to, e.g. Blog',
+        'operation' => 'What the domain does, e.g. Show (default: Index)',
     ];
 
     /**
@@ -30,26 +31,21 @@ class MakeDomainCommand extends Command
      */
     public function execute(): int
     {
-        $name = $this->argument('name');
+        $feature = $this->argument('feature');
 
-        if ($name === '') {
-            $this->error('Domain name cannot be empty.');
+        if ($feature === '') {
+            $this->error('Feature name cannot be empty.');
 
             return self::COMMAND_INVALID_ARGUMENT;
         }
 
-        $className = $this->toPascalCase($name);
+        $feature = $this->toPascalCase($feature);
+        $operation = $this->toPascalCase($this->argument('operation') ?: 'Index');
+        $viewName = $this->toKebabCase($feature);
+        $page = $this->toKebabCase($operation);
 
-        $status = $this->writeStub('Result', app_dir() . "/Domains/Results/{$className}.php", [
-            'className' => $className,
-        ]);
+        $spec = $this->pageOperation($feature, $operation, $viewName, $page);
 
-        if ($status !== self::COMMAND_SUCCESS) {
-            return $status;
-        }
-
-        return $this->writeStub('Domain', app_dir() . "/Domains/{$className}.php", [
-            'className' => $className,
-        ]);
+        return $this->writeDomain($feature, $operation, $viewName, '/' . $viewName, $spec);
     }
 }
