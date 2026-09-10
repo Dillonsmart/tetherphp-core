@@ -291,7 +291,9 @@ They share `Traits\InspectsApplication`, which loads `project_root() . '/routes/
 `routes/middleware.php` for what wraps it — see below for the contract that makes loading the second one safe.
 
 **The Result is read, not guessed.** The Domain and the Responder are found by name and the output says so, but
-`triple()` reflects on `Domain::handle()` for the Result. It has to: Results are shared by shape, so `Show` and
+`triple()` reflects on `Domain::handle()` for the Result — including a **union**, which is how a Domain says a
+section can end more than one way (`Post|PostNotFound`, with the Responder picking the view and the status off the
+type). A union is reported pipe-separated with no file path under it, because it names several. It has to: Results are shared by shape, so `Show` and
 `Edit` both return `Results\Record` and there is no `Results\Show` to predict — guessing reported "(not found)"
 for every action in every resource. Reading the declaration is also the standard the rest of this output is held
 to, so each part now carries a `declared` flag and `inspect` marks which is which. Reflection reads a signature and

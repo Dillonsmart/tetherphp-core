@@ -198,9 +198,16 @@ class ExplainCommand extends Command
             $part = $triple[$role];
             $line = $this->label($label) . $part['class'];
 
-            $this->line($part['exists']
-                ? $line . "\n" . $this->label('') . (string) $part['file']
-                : $line . "  \033[31m(not found)\033[0m");
+            if (!$part['exists']) {
+                $this->line($line . "  \033[31m(not found)\033[0m");
+                continue;
+            }
+
+            // a union of Result types names several files, so there is no one
+            // path to print under it
+            $this->line($part['file'] === null
+                ? $line
+                : $line . "\n" . $this->label('') . (string) $part['file']);
         }
 
         $this->line();
@@ -213,7 +220,7 @@ class ExplainCommand extends Command
         // exists: it is read off what handle() declares it returns
         $this->line($triple['result']['declared']
             ? "The Result is not a guess — it is the return type Domain::handle() declares."
-            : "The Result is a convention too; no Domain was found to read a return type from.");
+            : "The Result is a convention here; nothing declared a result type to read.");
 
         return self::COMMAND_SUCCESS;
     }

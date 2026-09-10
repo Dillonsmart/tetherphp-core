@@ -178,6 +178,7 @@ trait InspectsApplication
      * triple.
      *
      * @return array<string, array{class: string, exists: bool, file: ?string, declared: bool}>
+     *         `class` is pipe-separated when a Domain declares a union of Result types
      */
     protected function triple(string $action): array
     {
@@ -188,21 +189,27 @@ trait InspectsApplication
         $domain = "Domains\\{$name}";
 
         // the Action is what the route names, so it is not a guess; the Result
-        // is read off the Domain's own signature where the Domain exists
-        $classes = [
-            'action' => [$action, true],
-            'domain' => [$domain, false],
+        // is read off the Domain's own signature where the Domain declares one.
+        // Each role carries a list because a Domain may declare a union — the
+        // outcome-per-type pattern, where a miss is its own Result type
+        $roles = [
+            'action' => [[$action], true],
+            'domain' => [[$domain], false],
             'result' => $this->resultClass($domain, $name),
-            'responder' => ["Responders\\{$name}", false],
+            'responder' => [["Responders\\{$name}"], false],
         ];
 
         $triple = [];
 
-        foreach ($classes as $role => [$class, $declared]) {
+        foreach ($roles as $role => [$classes, $declared]) {
+            $missing = array_filter($classes, static fn (string $class): bool => !class_exists($class));
+
             $triple[$role] = [
-                'class' => $class,
-                'exists' => class_exists($class),
-                'file' => $this->classFile($class),
+                'class' => implode('|', $classes),
+                'exists' => $classes !== [] && $missing === [],
+                // a union names several files, and pointing at one of them
+                // would be picking a favourite
+                'file' => count($classes) === 1 ? $this->classFile($classes[0]) : null,
                 'declared' => $declared,
             ];
         }
@@ -229,42 +236,64 @@ trait InspectsApplication
      * The conventional names remain the fallback, for a Domain that is missing,
      * has no `handle()` yet, or returns the `DomainResult` interface itself.
      *
-     * @return array{0: string, 1: bool} the class, and whether the code declared it
+     * @return array{0: list<string>, 1: bool} the classes, and whether the code declared them
      */
     protected function resultClass(string $domain, string $name): array
     {
-        $declared = $this->declaredResultType($domain);
+        $declared = $this->declaredResultTypes($domain);
 
-        if ($declared !== null) {
+        if ($declared !== []) {
             return [$declared, true];
         }
 
-        return [$this->conventionalResultClass($name), false];
+        return [[$this->conventionalResultClass($name)], false];
     }
 
-    private function declaredResultType(string $domain): ?string
+    /**
+     * The Result types `handle()` declares, which may be more than one.
+     *
+     * A union is the framework's own documented way of saying a section can end
+     * more than one way — `Post|PostNotFound`, with the Responder picking both
+     * the view and the status off the type. Reading only a single named type
+     * meant every domain written that way fell back to the naming convention
+     * and was reported as missing, which is the one shape of Domain most worth
+     * being able to explain.
+     *
+     * @return list<string> empty when nothing useful is declared
+     */
+    private function declaredResultTypes(string $domain): array
     {
         if (!class_exists($domain)) {
-            return null;
+            return [];
         }
 
         $class = new \ReflectionClass($domain);
 
         if (!$class->hasMethod('handle')) {
-            return null;
+            return [];
         }
 
         $type = $class->getMethod('handle')->getReturnType();
 
-        if (!$type instanceof \ReflectionNamedType || $type->isBuiltin()) {
-            return null;
+        $members = $type instanceof \ReflectionUnionType ? $type->getTypes() : [$type];
+
+        $names = [];
+
+        foreach ($members as $member) {
+            if (!$member instanceof \ReflectionNamedType || $member->isBuiltin()) {
+                continue;
+            }
+
+            // the base class declares the interface; a subclass that has not
+            // narrowed it tells us nothing a reader does not already know
+            if ($member->getName() === DomainResult::class) {
+                continue;
+            }
+
+            $names[] = $member->getName();
         }
 
-        $name = $type->getName();
-
-        // the base class declares the interface; a subclass that has not
-        // narrowed it tells us nothing a reader does not already know
-        return $name === DomainResult::class ? null : $name;
+        return $names;
     }
 
     /**

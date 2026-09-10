@@ -19,9 +19,9 @@ final class Response
      * @param array<string, string> $headers
      */
     public function __construct(
-        private readonly string $body = '',
-        private readonly int $status = 200,
-        private readonly array $headers = [],
+        private string $body = '',
+        private int    $status = 200,
+        private array  $headers = [],
     ) {
     }
 

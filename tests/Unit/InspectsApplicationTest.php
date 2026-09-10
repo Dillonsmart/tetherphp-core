@@ -91,6 +91,36 @@ class InspectsApplicationTest extends TestCase
     }
 
     /**
+     * A Domain that can end more than one way says so with a union, which is
+     * the framework's own documented pattern — a Result type per outcome, with
+     * the Responder picking the view and the status off the type.
+     *
+     * Reading only a single named type meant every domain written that way
+     * fell back to the naming convention and was reported as missing. The
+     * website found this: its dev log returns Post|PostNotFound.
+     */
+    public function testAUnionOfResultTypesIsReadRatherThanGuessedAt(): void
+    {
+        $result = $this->inspector->inspect('Actions\Catalogue\Outcomes')['result'];
+
+        $this->assertSame(
+            'Domains\Catalogue\Results\Collection|Domains\Catalogue\Results\Missing',
+            $result['class'],
+        );
+        $this->assertTrue($result['declared']);
+        $this->assertTrue($result['exists']);
+    }
+
+    /**
+     * A union names several files, so there is no single path to report and
+     * explain prints none rather than picking a favourite.
+     */
+    public function testAUnionReportsNoSingleFile(): void
+    {
+        $this->assertNull($this->inspector->inspect('Actions\Catalogue\Outcomes')['result']['file']);
+    }
+
+    /**
      * A Domain that declares `mixed` says nothing a reader does not already
      * know, so the convention takes over and the output admits it is guessing.
      */
