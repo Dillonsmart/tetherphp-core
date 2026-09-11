@@ -336,6 +336,30 @@ Two things follow:
   fails. A release that changes the declaration needs the skeleton's constraint bumped past it — see
   `docs/agents/releasing.md`.
 
+## Why sessions stay in core
+
+`Session`, `CsrfToken` and `VerifyCsrfToken` were once planned for extraction into their own package, as the proof
+that "small core, composed beyond" is a real architecture rather than a claim. **That is not happening**, and the
+reasoning is worth keeping because the question comes back.
+
+The extraction would not decouple anything. Every reference to `Session` or `CsrfToken` outside `framework/Sessions/`
+and `VerifyCsrfToken` itself is a **comment**, not code — the seam already carries the whole relationship, and an
+application that leaves `VerifyCsrfToken` out of `routes/middleware.php` already boots with no session and no cookie.
+PHP autoloads lazily, so the 311 lines cost an application that never composes them nothing at all.
+
+What it would add is a repository, a Packagist entry, a release cadence and a version constraint to keep in step —
+and cross-repo coordination is demonstrably where mistakes happen in this project.
+
+**The one real argument for it was diagnostic**, not structural: you do not find out whether the seam is enough for
+somebody else's package until something is one. That argument is answered more cheaply by fixing what it would have
+found, and the first of those is already known:
+
+> **A package cannot contribute a console command.** `Console::registerCommands()` globs exactly two directories —
+> core's own `Commands/` and the application's `app/Commands/`. A third-party package can ship middleware, but it
+> cannot ship `tether session:gc`, and nothing reports the absence: the command simply does not exist.
+
+Fix discovery gaps like that one when a real package needs them. Do not split a directory to prove a point.
+
 ## The pipeline
 
 `Kernel::run()` returns a `Response`. Every path through it does — a match, a

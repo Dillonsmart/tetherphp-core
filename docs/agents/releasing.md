@@ -56,6 +56,10 @@ will not accept `0.4.0`. Bump the minor for anything a consumer can trip over:
 
 Patch releases are for changes no consumer can observe structurally.
 
+**A patch can still break something if you are not careful.** `v0.10.1` was a patch that silently dropped `readonly`
+from `Response`'s properties, because an unrelated edit was sitting in the working tree and `git add -A` took it.
+Check what is staged against what the message claims, not what `git status` prints through a filter.
+
 ## Coordinating with the skeleton
 
 The skeleton declares a constraint on this package in its `composer.json`, and `composer create-project
