@@ -166,10 +166,15 @@ more. `Command.txt` is the exception, because a console command is not an ADR tr
 | --- | --- |
 | `Action.txt` | every Action, in `Actions\{Feature}` |
 | `Domain.txt` / `DomainWithInput.txt` | a Domain, with or without constructor input |
-| `ResultPage.txt` / `ResultCollection.txt` / `ResultRecord.txt` / `ResultWritten.txt` | the four result shapes — each renders a class named for the shape, not the operation |
+| `DomainWrite.txt` | a Domain that takes input and may refuse it — `Store` and `Update`, returning `Written\|Invalid` |
+| `Attributes.txt` | the one class per feature where the fields and their rules live, shared by `Store` and `Update` |
+| `ResultPage.txt` / `ResultCollection.txt` / `ResultRecord.txt` / `ResultWritten.txt` | four of the result shapes — each renders a class named for the shape, not the operation |
+| `ResultInvalid.txt` | the fifth: a refused write. Names itself, because `{{result}}` is the operation's primary result |
 | `ResponderPage.txt` / `ResponderCollection.txt` / `ResponderRecord.txt` | a Responder that renders |
-| `ResponderRedirect.txt` | a Responder that redirects — what a write answers with |
-| `ViewPage.txt` / `ViewIndex.txt` / `ViewShow.txt` / `ViewForm.txt` | the templates — each opens with a `@var` docblock declaring the variables its Responder passes |
+| `ResponderForm.txt` | `Create` and `Edit`: renders the form with `errors` empty |
+| `ResponderRedirect.txt` | a Responder that redirects — `Destroy` |
+| `ResponderWrite.txt` | `Store` and `Update`: a 303 for a `Written`, the form again as a 422 for an `Invalid` |
+| `ViewPage.txt` / `ViewIndex.txt` / `ViewShow.txt` / `ViewForm.txt` | the templates — each opens with a `@var` docblock declaring the variables its Responder passes, and each is a whole page: it includes the skeleton's `partials/header.php` and `partials/footer.php` and sets `$pageTitle` |
 | `Command.txt` | `make:command` |
 
 | Placeholder            | Substituted by | Used in |
@@ -187,6 +192,11 @@ more. `Command.txt` is the exception, because a console command is not an ADR tr
 | `{{redirect}}`         | `make:resource`        | `ResponderRedirect.txt` |
 | `{{className}}`        | `make:command`         | `Command.txt` only |
 | `{{commandName}}`      | `make:command`         | `Command.txt` |
+
+**Every view stub is a whole page.** It includes `partials/header.php` and `partials/footer.php`, which the
+skeleton ships and so every application has, and sets the `$pageTitle` the header reads. Generated views used to be
+bare fragments — an `<h1>` with no `<html>` around it — so a generated feature was not something a browser could
+show properly until someone wrapped it. The test fixture carries the two partials for the same reason.
 
 **Every view stub opens with a `@var` docblock** naming the variables its Responder stub passes. A view receives
 its variables by `extract()`, so nothing in the template declares them and an IDE marks every one undefined; the
@@ -241,16 +251,17 @@ commands exist to say what is on disk. New code never writes it.
 **every other generator writes the page shape** — one page, nothing read off the request. If you want a resource's
 Show, run `make:resource`.
 
-### The four result shapes
+### The five result shapes
 
 A `DomainResult` carries what the domain knows into the Responder, named in the domain's terms. Across a CRUD
-resource there are only three answers a domain gives, plus one for a page that is neither:
+resource there are only four answers a domain gives, plus one for a page that is neither:
 
 | Shape | Means | Used by | Responder |
 | --- | --- | --- | --- |
 | `Collection` | many records | `Index` | renders a list, and is handed `$request->query` so it can page and filter |
 | `Record` | one record, and its identity | `Create`, `Show`, `Edit` | renders a detail page or a form |
 | `Written` | something changed, and which one | `Store`, `Update`, `Destroy` | redirects, 303 |
+| `Invalid` | a write was refused: what was sent, and why | `Store`, `Update`, as the second type of `Written\|Invalid` | renders the form again, 422 |
 | `Page` | a page with neither behind it | `make:feature`, and every piecemeal generator | renders |
 
 Two details that are load-bearing rather than stylistic:
@@ -262,14 +273,24 @@ Two details that are load-bearing rather than stylistic:
   for the record again, so loading it here would be work the response throws away. `Destroy` is the loosest fit: it
   reports the id it deleted and its redirect goes to the collection, so the generated code does not read it.
 
-These are starting shapes, not a fixed vocabulary. The generator cannot know a domain, so it writes the three that
+- **`Invalid` is a type, not a flag.** `Store::handle()` is declared `Written|Invalid`, and the Responder for it
+  tells them apart with `instanceof`: a `Written` is a 303 to the record, an `Invalid` is the form view rendered
+  again with `attributes` (what was typed) and `errors` (field => message) as a 422. No flash session, no
+  redirect-back, no validator object — the same rule that makes a miss a different class from a hit. Where the rules
+  live is `Domains\<Feature>\Attributes`: one class per feature with `fromPayload(array): self`, `values`, `errors`
+  and `isValid()`, shared by Store and Update. The generator writes it with two TODOs — name the fields, write the
+  rules — because it cannot know either; the example application's `Domains\Note\Attributes` is what a finished one
+  looks like. There is no validation layer in the framework and this is deliberate: a class that does nothing
+  general stays readable.
+
+These are starting shapes, not a fixed vocabulary. The generator cannot know a domain, so it writes the four that
 CRUD always needs; renaming them and their properties for what the domain actually deals in is the expected next
 step, and the stubs say so.
 
 ## Generating a CRUD resource
 
 `make:resource <Name>` writes the seven ADR triples a resource is made of — `Index`, `Create`, `Store`, `Show`,
-`Edit`, `Update`, `Destroy` — each with its own Action, Domain and Responder, the three Results they share between
+`Edit`, `Update`, `Destroy` — each with its own Action, Domain and Responder, the four Results they share between
 them, and the four views that render. `--uri=/posts` sets the base URI the routes and redirects use; it defaults to the kebab-cased name.
 
 **There is no pluraliser and there is not going to be one.** Guessing that `Post` becomes `posts` and `Category`

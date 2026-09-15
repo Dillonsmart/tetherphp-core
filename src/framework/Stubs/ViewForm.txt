@@ -1,14 +1,15 @@
 <?php
 /**
- * What Responders\{{feature}}\{{operation}} hands this view.
+ * What Responders\{{feature}}\{{operation}} hands this view — or what the
+ * Responder for the write it submits to hands it, when the write is refused.
  *
- * @var string               $id
- * @var array<string, mixed> $attributes
+ * @var string                $id          '' for a record that does not exist yet
+ * @var array<string, mixed>  $attributes  what to show in the fields
+ * @var array<string, string> $errors      field => message; empty when nothing is wrong
  */
-?>
-<h1><?php echo $id === '' ? 'New {{feature}}' : 'Edit {{feature}} ' . htmlspecialchars($id); ?></h1>
+$pageTitle = $id === '' ? 'New {{feature}}' : 'Edit {{feature}} ' . $id;
+include views_dir() . '/partials/header.php';
 
-<?php
 /*
  * One form for both create and edit. A browser form can only send GET or POST,
  * so an update declares the verb it means in _method and Middleware\OverridesMethod
@@ -18,25 +19,37 @@
 $action = $id === '' ? '{{uri}}' : '{{uri}}/' . $id;
 ?>
 
-<form method="post" action="<?php echo htmlspecialchars($action); ?>">
-    <?php if ($id !== ''): ?>
-        <input type="hidden" name="_method" value="PUT">
-    <?php endif; ?>
+<main class="max-w-2xl mx-auto px-6 py-16">
+    <p class="mb-6"><a href="{{uri}}" class="text-sm underline underline-offset-4 hover:opacity-70">&larr; All {{feature}}</a></p>
 
-    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
+    <h1 class="text-3xl mb-8"><?php echo htmlspecialchars($pageTitle); ?></h1>
 
-    <?php foreach ($attributes as $name => $value): ?>
-        <p>
-            <label for="<?php echo htmlspecialchars((string) $name); ?>">
-                <?php echo htmlspecialchars((string) $name); ?>
-            </label>
-            <input
-                id="<?php echo htmlspecialchars((string) $name); ?>"
-                name="<?php echo htmlspecialchars((string) $name); ?>"
-                value="<?php echo htmlspecialchars((string) $value); ?>"
-            >
-        </p>
-    <?php endforeach; ?>
+    <form method="post" action="<?php echo htmlspecialchars($action); ?>" class="space-y-6">
+        <?php if ($id !== ''): ?>
+            <input type="hidden" name="_method" value="PUT">
+        <?php endif; ?>
 
-    <button type="submit">Save</button>
-</form>
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
+
+        <?php foreach ($attributes as $name => $value): ?>
+            <div>
+                <label for="<?php echo htmlspecialchars((string) $name); ?>" class="block mb-1">
+                    <?php echo htmlspecialchars((string) $name); ?>
+                </label>
+                <input
+                    id="<?php echo htmlspecialchars((string) $name); ?>"
+                    name="<?php echo htmlspecialchars((string) $name); ?>"
+                    value="<?php echo htmlspecialchars((string) $value); ?>"
+                    class="w-full border px-3 py-2 bg-transparent"
+                >
+                <?php if (isset($errors[$name])): ?>
+                    <p class="text-sm text-red-700 mt-1"><?php echo htmlspecialchars($errors[$name]); ?></p>
+                <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
+
+        <button type="submit" class="border px-4 py-2 hover:opacity-70">Save</button>
+    </form>
+</main>
+
+<?php include views_dir() . '/partials/footer.php'; ?>

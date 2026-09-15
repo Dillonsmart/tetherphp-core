@@ -23,14 +23,19 @@ class StubsTest extends TestCase
         'Action',
         'Domain',
         'DomainWithInput',
+        'DomainWrite',
+        'Attributes',
         'ResultPage',
         'ResultCollection',
         'ResultRecord',
         'ResultWritten',
+        'ResultInvalid',
         'ResponderPage',
         'ResponderCollection',
         'ResponderRecord',
+        'ResponderForm',
         'ResponderRedirect',
+        'ResponderWrite',
         'ViewPage',
         'ViewIndex',
         'ViewShow',
@@ -42,14 +47,19 @@ class StubsTest extends TestCase
         'Action',
         'Domain',
         'DomainWithInput',
+        'DomainWrite',
+        'Attributes',
         'ResultPage',
         'ResultCollection',
         'ResultRecord',
         'ResultWritten',
+        'ResultInvalid',
         'ResponderPage',
         'ResponderCollection',
         'ResponderRecord',
+        'ResponderForm',
         'ResponderRedirect',
+        'ResponderWrite',
     ];
 
     private function stub(string $name): string
@@ -112,14 +122,19 @@ class StubsTest extends TestCase
             'Action' => 'namespace Actions\\{{feature}};',
             'Domain' => 'namespace Domains\\{{feature}};',
             'DomainWithInput' => 'namespace Domains\\{{feature}};',
+            'DomainWrite' => 'namespace Domains\\{{feature}};',
+            'Attributes' => 'namespace Domains\\{{feature}};',
             'ResultPage' => 'namespace Domains\\{{feature}}\\Results;',
             'ResultCollection' => 'namespace Domains\\{{feature}}\\Results;',
             'ResultRecord' => 'namespace Domains\\{{feature}}\\Results;',
             'ResultWritten' => 'namespace Domains\\{{feature}}\\Results;',
+            'ResultInvalid' => 'namespace Domains\\{{feature}}\\Results;',
             'ResponderPage' => 'namespace Responders\\{{feature}};',
             'ResponderCollection' => 'namespace Responders\\{{feature}};',
             'ResponderRecord' => 'namespace Responders\\{{feature}};',
+            'ResponderForm' => 'namespace Responders\\{{feature}};',
             'ResponderRedirect' => 'namespace Responders\\{{feature}};',
+            'ResponderWrite' => 'namespace Responders\\{{feature}};',
         ];
 
         foreach ($namespaces as $stub => $namespace) {
@@ -134,7 +149,7 @@ class StubsTest extends TestCase
      */
     public function testResultsAreNestedUnderTheFeatureNotInASharedBucket(): void
     {
-        foreach (['ResultPage', 'ResultCollection', 'ResultRecord', 'ResultWritten'] as $stub) {
+        foreach (['ResultPage', 'ResultCollection', 'ResultRecord', 'ResultWritten', 'ResultInvalid'] as $stub) {
             $this->assertStringNotContainsString('namespace Domains\\Results;', $this->stub($stub));
         }
 
@@ -168,7 +183,7 @@ class StubsTest extends TestCase
      */
     public function testRenderingRespondersActuallyReturnSomething(): void
     {
-        foreach (['ResponderPage', 'ResponderCollection', 'ResponderRecord'] as $stub) {
+        foreach (['ResponderPage', 'ResponderCollection', 'ResponderRecord', 'ResponderForm', 'ResponderWrite'] as $stub) {
             $this->assertMatchesRegularExpression('/\breturn\s+\$this->view\(/', $this->stub($stub));
             $this->assertStringNotContainsString('// return', $this->stub($stub));
         }
@@ -176,7 +191,7 @@ class StubsTest extends TestCase
 
     public function testRenderingRespondersRenderThePageTheGeneratorWrote(): void
     {
-        foreach (['ResponderPage', 'ResponderCollection', 'ResponderRecord'] as $stub) {
+        foreach (['ResponderPage', 'ResponderCollection', 'ResponderRecord', 'ResponderForm', 'ResponderWrite'] as $stub) {
             $this->assertStringContainsString("pages.{{viewName}}.{{page}}", $this->stub($stub));
         }
     }
@@ -196,10 +211,10 @@ class StubsTest extends TestCase
 
     public function testResultStubsAreValueObjectsMarkedAsADomainResult(): void
     {
-        foreach (['ResultPage', 'ResultCollection', 'ResultRecord', 'ResultWritten'] as $stub) {
+        foreach ($this->resultClasses() as $stub => $class) {
             $content = $this->stub($stub);
 
-            $this->assertStringContainsString('final readonly class {{result}} implements DomainResult', $content);
+            $this->assertStringContainsString("final readonly class {$class} implements DomainResult", $content);
             $this->assertStringContainsString('use TetherPHP\\framework\\Interfaces\\DomainResult;', $content);
         }
     }
@@ -226,10 +241,44 @@ class StubsTest extends TestCase
      */
     public function testAWriteRespondsWithASeeOtherRedirect(): void
     {
-        $this->assertStringContainsString(
-            'return Response::redirect({{redirect}}, 303);',
-            $this->stub('ResponderRedirect'),
-        );
+        foreach (['ResponderRedirect', 'ResponderWrite'] as $stub) {
+            $this->assertStringContainsString('return Response::redirect({{redirect}}, 303);', $this->stub($stub));
+        }
+    }
+
+    /**
+     * A write that takes input can refuse it. The refusal is a second result
+     * type rather than a flag, the Domain declares both, and the Responder
+     * renders the form again as a 422 rather than redirecting anywhere.
+     */
+    public function testARefusedWriteIsASecondResultTypeAndTheFormAgain(): void
+    {
+        $domain = $this->stub('DomainWrite');
+        $this->assertStringContainsString('public function handle(): Written|Invalid', $domain);
+        $this->assertStringContainsString('Attributes::fromPayload($this->payload)', $domain);
+        $this->assertStringContainsString('return new Invalid({{resultArguments}}, $attributes->values, $attributes->errors);', $domain);
+
+        $responder = $this->stub('ResponderWrite');
+        $this->assertStringContainsString('public function __invoke(Written|Invalid $result): Response', $responder);
+        $this->assertStringContainsString("'errors' => \$result->errors,\n            ], 422);", $responder);
+
+        $this->assertStringContainsString("'errors' => [],", $this->stub('ResponderForm'));
+        $this->assertStringContainsString('@var array<string, string> $errors', $this->stub('ViewForm'));
+        $this->assertStringContainsString('isset($errors[$name])', $this->stub('ViewForm'));
+    }
+
+    /**
+     * A generated page is a page. Every view stub includes the header and
+     * footer partials the skeleton ships, and sets the title the header reads.
+     */
+    public function testEveryViewIsAWholePageNotAFragment(): void
+    {
+        foreach (['ViewPage', 'ViewIndex', 'ViewShow', 'ViewForm'] as $stub) {
+            $view = $this->stub($stub);
+            $this->assertStringContainsString("include views_dir() . '/partials/header.php';", $view, $stub);
+            $this->assertStringContainsString("include views_dir() . '/partials/footer.php';", $view, $stub);
+            $this->assertStringContainsString('$pageTitle = ', $view, $stub);
+        }
     }
 
     /**
@@ -249,6 +298,8 @@ class StubsTest extends TestCase
             'ResponderPage' => 'ViewPage',
             'ResponderCollection' => 'ViewIndex',
             'ResponderRecord' => 'ViewShow',
+            'ResponderForm' => 'ViewForm',
+            'ResponderWrite' => 'ViewForm',
         ];
 
         foreach ($pairs as $responder => $view) {
@@ -265,10 +316,6 @@ class StubsTest extends TestCase
                 );
             }
         }
-
-        // the form is rendered by the same Responder as the show page
-        $this->assertStringContainsString('@var string               $id', $this->stub('ViewForm'));
-        $this->assertStringContainsString('$attributes', $this->stub('ViewForm'));
     }
 
     public function testTheGeneratedFormsDeclareTheVerbTheyMean(): void
@@ -301,12 +348,30 @@ class StubsTest extends TestCase
      */
     public function testResultsAreNamedForTheirShapeNotTheOperation(): void
     {
-        foreach (['ResultPage', 'ResultCollection', 'ResultRecord', 'ResultWritten'] as $stub) {
+        foreach ($this->resultClasses() as $stub => $class) {
             $content = $this->stub($stub);
 
-            $this->assertStringContainsString('class {{result}} implements DomainResult', $content);
+            $this->assertStringContainsString("class {$class} implements DomainResult", $content);
             $this->assertStringNotContainsString('class {{operation}}', $content);
         }
+    }
+
+    /**
+     * `{{result}}` is the primary result of an operation — Written, for a
+     * write. Invalid is the second result of the same operation, so its stub
+     * names itself rather than taking the placeholder.
+     *
+     * @return array<string, string> stub => the class it declares
+     */
+    private function resultClasses(): array
+    {
+        return [
+            'ResultPage' => '{{result}}',
+            'ResultCollection' => '{{result}}',
+            'ResultRecord' => '{{result}}',
+            'ResultWritten' => '{{result}}',
+            'ResultInvalid' => 'Invalid',
+        ];
     }
 
     /**

@@ -19,9 +19,10 @@ namespace TetherPHP\framework\Traits;
  *
  * Actions, Domains and Responders are named for the operation; a Result is
  * named for its shape, and shared by every operation of the feature that
- * answers the same way. A resource has seven of the first three and three
+ * answers the same way. A resource has seven of the first three and four
  * Results: `Collection` for the list, `Record` for the one, `Written` for the
- * three that change something and answer with a redirect.
+ * three that change something and answer with a redirect, and `Invalid` for
+ * the two of those that take input and may refuse it.
  *
  * Features used to be flat — `app/Actions/Blog.php` — and resources nested,
  * which was two layouts for one concept. It was also a dead end: a feature that
@@ -43,7 +44,8 @@ namespace TetherPHP\framework\Traits;
  *     page: string,
  *     view: string,
  *     redirect: string,
- *     todo: string
+ *     todo: string,
+ *     refuses: bool
  * }
  */
 trait GeneratesTriples
@@ -75,6 +77,7 @@ trait GeneratesTriples
             'view' => 'ViewPage',
             'redirect' => '',
             'todo' => 'return what this page needs.',
+            'refuses' => false,
         ];
     }
 
@@ -112,6 +115,7 @@ trait GeneratesTriples
                 'view' => 'ViewIndex',
                 'redirect' => '',
                 'todo' => 'read the records to list.',
+                'refuses' => false,
             ],
             'Create' => [
                 'verb' => 'get',
@@ -121,25 +125,27 @@ trait GeneratesTriples
                 'domainArguments' => '',
                 'result' => 'ResultRecord',
                 'resultArguments' => "'', []",
-                'responder' => 'ResponderRecord',
+                'responder' => 'ResponderForm',
                 'page' => 'create',
                 'view' => 'ViewForm',
                 'redirect' => '',
                 'todo' => 'return the empty attributes a new record starts with.',
+                'refuses' => false,
             ],
             'Store' => [
                 'verb' => 'post',
                 'route' => $uri,
-                'domain' => 'DomainWithInput',
+                'domain' => 'DomainWrite',
                 'domainProperties' => $payload,
                 'domainArguments' => $fromBody,
                 'result' => 'ResultWritten',
                 'resultArguments' => "''",
-                'responder' => 'ResponderRedirect',
-                'page' => '',
+                'responder' => 'ResponderWrite',
+                'page' => 'create',
                 'view' => '',
                 'redirect' => "'{$uri}/' . \$result->id",
-                'todo' => 'create a record from $this->payload and return its identifier.',
+                'todo' => 'create a record from $attributes->values and return its identifier.',
+                'refuses' => true,
             ],
             'Show' => [
                 'verb' => 'get',
@@ -154,6 +160,7 @@ trait GeneratesTriples
                 'view' => 'ViewShow',
                 'redirect' => '',
                 'todo' => 'find the record identified by $this->id, or throw HttpNotFoundException.',
+                'refuses' => false,
             ],
             'Edit' => [
                 'verb' => 'get',
@@ -163,25 +170,27 @@ trait GeneratesTriples
                 'domainArguments' => $fromPath,
                 'result' => 'ResultRecord',
                 'resultArguments' => '$this->id, []',
-                'responder' => 'ResponderRecord',
+                'responder' => 'ResponderForm',
                 'page' => 'edit',
                 'view' => 'ViewForm',
                 'redirect' => '',
                 'todo' => 'find the record identified by $this->id, or throw HttpNotFoundException.',
+                'refuses' => false,
             ],
             'Update' => [
                 'verb' => 'put',
                 'route' => $uri . '/{id}',
-                'domain' => 'DomainWithInput',
+                'domain' => 'DomainWrite',
                 'domainProperties' => $id . "\n" . $payload,
                 'domainArguments' => $fromPath . ', ' . $fromBody,
                 'result' => 'ResultWritten',
                 'resultArguments' => '$this->id',
-                'responder' => 'ResponderRedirect',
-                'page' => '',
+                'responder' => 'ResponderWrite',
+                'page' => 'edit',
                 'view' => '',
                 'redirect' => "'{$uri}/' . \$result->id",
-                'todo' => 'apply $this->payload to the record identified by $this->id.',
+                'todo' => 'apply $attributes->values to the record identified by $this->id.',
+                'refuses' => true,
             ],
             'Destroy' => [
                 'verb' => 'delete',
@@ -196,6 +205,7 @@ trait GeneratesTriples
                 'view' => '',
                 'redirect' => "'{$uri}'",
                 'todo' => 'delete the record identified by $this->id.',
+                'refuses' => false,
             ],
         ];
     }
@@ -286,6 +296,19 @@ trait GeneratesTriples
 
         if ($status !== self::COMMAND_SUCCESS) {
             return $status;
+        }
+
+        // a write that takes input can refuse it, which is a second result
+        // type and the one class where the feature's rules live — both shared
+        // by Store and Update, so the second to arrive reuses them
+        if ($spec['refuses']) {
+            foreach (['ResultInvalid' => "/Domains/{$feature}/Results/Invalid.php", 'Attributes' => "/Domains/{$feature}/Attributes.php"] as $stub => $path) {
+                $status = $this->writeSharedStub($stub, app_dir() . $path, $replacements);
+
+                if ($status !== self::COMMAND_SUCCESS) {
+                    return $status;
+                }
+            }
         }
 
         return $this->writeStub($spec['domain'], app_dir() . "/Domains/{$feature}/{$operation}.php", $replacements);

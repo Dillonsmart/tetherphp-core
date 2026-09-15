@@ -4,15 +4,22 @@
  *
  * @var string $title
  */
+$pageTitle = $title;
+include views_dir() . '/partials/header.php';
 ?>
-<h1><?php echo htmlspecialchars($title); ?></h1>
 
-<p>
-    This view is <code>app/Views/pages/{{viewName}}/{{page}}.php</code>, rendered by
-    the <code>Responders\{{feature}}\{{operation}}</code> responder.
-</p>
+<main class="max-w-2xl mx-auto px-6 py-16">
+    <h1 class="text-3xl mb-6"><?php echo htmlspecialchars($title); ?></h1>
 
-<p>
-    <code>$title</code> is named by that responder, out of the
-    <code>Domains\{{feature}}\Results\{{operation}}</code> the domain returned.
-</p>
+    <p class="mb-4">
+        This view is <code>app/Views/pages/{{viewName}}/{{page}}.php</code>, rendered by
+        the <code>Responders\{{feature}}\{{operation}}</code> responder.
+    </p>
+
+    <p>
+        <code>$title</code> is named by that responder, out of the
+        <code>Domains\{{feature}}\Results\{{result}}</code> the domain returned.
+    </p>
+</main>
+
+<?php include views_dir() . '/partials/footer.php'; ?>

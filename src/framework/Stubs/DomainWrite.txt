@@ -1,0 +1,42 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Domains\{{feature}};
+
+use Domains\Domain;
+use Domains\{{feature}}\Results\Invalid;
+use Domains\{{feature}}\Results\Written;
+
+class {{operation}} extends Domain
+{
+    /**
+     * What this domain needs arrives through its constructor.
+     *
+     * Not through handle(): the base class declares `handle(): DomainResult`
+     * with no parameters, and PHP will not let an override add a required one.
+     * The Action reads it off the request and hands it over, which is the same
+     * rule the Kernel follows with the services.
+     */
+    public function __construct(
+{{domainProperties}}
+    ) {
+    }
+
+    /**
+     * One result type per outcome: the write that happened, or the refusal
+     * with what was sent and why. The Responder tells them apart by type.
+     */
+    public function handle(): Written|Invalid
+    {
+        $attributes = Attributes::fromPayload($this->payload);
+
+        if (!$attributes->isValid()) {
+            return new Invalid({{resultArguments}}, $attributes->values, $attributes->errors);
+        }
+
+        // TODO: {{todo}}
+
+        return new Written({{resultArguments}});
+    }
+}

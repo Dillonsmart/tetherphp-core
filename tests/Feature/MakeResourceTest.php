@@ -72,17 +72,42 @@ class MakeResourceTest extends TestCase
      * produced four classes that differed from another by their name and
      * nothing else.
      */
-    public function testTheSevenOperationsShareThreeResults(): void
+    public function testTheSevenOperationsShareFourResults(): void
     {
         $this->generate('Widget', '--uri=/widgets');
 
-        foreach (['Collection', 'Record', 'Written'] as $shape) {
+        foreach (['Collection', 'Record', 'Written', 'Invalid'] as $shape) {
             $this->assertFileExists(app_dir() . "/Domains/Widget/Results/{$shape}.php");
         }
 
         $results = glob(app_dir() . '/Domains/Widget/Results/*.php') ?: [];
 
-        $this->assertCount(3, $results);
+        $this->assertCount(4, $results);
+    }
+
+    /**
+     * Store and Update take input and may refuse it, so both declare the
+     * refusal in their return type and share one Attributes class holding the
+     * feature's rules; Destroy takes no input and answers with Written alone.
+     */
+    public function testTheWritesThatTakeInputCanRefuseIt(): void
+    {
+        $this->generate('Widget', '--uri=/widgets');
+
+        $this->assertFileExists(app_dir() . '/Domains/Widget/Attributes.php');
+
+        foreach (['Store', 'Update'] as $operation) {
+            $domain = (string) file_get_contents(app_dir() . "/Domains/Widget/{$operation}.php");
+            $responder = (string) file_get_contents(app_dir() . "/Responders/Widget/{$operation}.php");
+
+            $this->assertStringContainsString('public function handle(): Written|Invalid', $domain);
+            $this->assertStringContainsString('__invoke(Written|Invalid $result)', $responder);
+        }
+
+        $this->assertStringContainsString("pages.widget.create", (string) file_get_contents(app_dir() . '/Responders/Widget/Store.php'));
+        $this->assertStringContainsString("pages.widget.edit", (string) file_get_contents(app_dir() . '/Responders/Widget/Update.php'));
+        $this->assertStringContainsString('public function handle(): Written', (string) file_get_contents(app_dir() . '/Domains/Widget/Destroy.php'));
+        $this->assertStringNotContainsString('Invalid', (string) file_get_contents(app_dir() . '/Domains/Widget/Destroy.php'));
     }
 
     /**
