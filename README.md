@@ -6,6 +6,9 @@ sessions, CSRF protection as composable middleware, the console kernel and the c
 This repository is the **source of truth** for the framework. The `dillonsmart/tetherphp` skeleton application consumes
 it as a Composer dependency; framework changes are made here, not there.
 
+It is built in public. The [dev log](https://tetherphp.com/devlog) records what broke and why, and development is
+posted on X at [@DillonDevStuff](https://x.com/DillonDevStuff).
+
 ## Requirements
 
 - PHP 8.5 or higher (property hooks and `new` without parentheses are used throughout)
