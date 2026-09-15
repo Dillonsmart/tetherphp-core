@@ -28,18 +28,36 @@ class MakeCommand extends Command
             return self::COMMAND_INVALID_ARGUMENT;
         }
 
-        // 'send-emails', 'SendEmails' and 'SendEmailsCommand' all name the same command
-        $baseName = preg_replace('/Command$/', '', $this->toPascalCase($name));
+        if (preg_match('/[^A-Za-z0-9:_-]/', $name) === 1) {
+            $this->error("'{$name}' is not a valid command name: letters, digits, '-', '_' and ':' only.");
+            return self::COMMAND_INVALID_ARGUMENT;
+        }
 
-        if (empty($baseName)) {
+        // 'send-emails', 'SendEmails' and 'SendEmailsCommand' all name the same
+        // command. A colon namespaces it the way the framework's own commands are
+        // — 'db:schema' is class DbSchemaCommand and is invoked as db:schema — so
+        // each segment is cased on its own and the colon survives into the name
+        // but never into the class, where it would be a parse error.
+        $segments = array_values(array_filter(explode(':', $name), static fn (string $s): bool => $s !== ''));
+
+        if ($segments === []) {
+            $this->error("'{$name}' is not a valid command name.");
+            return self::COMMAND_INVALID_ARGUMENT;
+        }
+
+        $last = array_key_last($segments);
+        $segments[$last] = preg_replace('/Command$/', '', $this->toPascalCase($segments[$last])) ?? '';
+        $segments = array_map($this->toPascalCase(...), $segments);
+
+        if (implode('', $segments) === '') {
             $this->error("'{$name}' is not a valid command name.");
             return self::COMMAND_INVALID_ARGUMENT;
         }
 
         $this->createCommandDirectory();
 
-        $className = $baseName . 'Command';
-        $commandName = $this->toKebabCase($baseName);
+        $className = implode('', $segments) . 'Command';
+        $commandName = implode(':', array_map($this->toKebabCase(...), $segments));
 
         $commandFilePath = app_dir() . "/Commands/{$className}.php";
 
