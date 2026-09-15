@@ -40,7 +40,8 @@ class KernelTest extends TestCase
     {
         // the framework takes its own handlers back off now, rather than the
         // tests papering over a leak
-        foreach ($this->kernels as $kernel) {
+        // last in, first out: a Kernel only removes its handler when it is on top
+        foreach (array_reverse($this->kernels) as $kernel) {
             $kernel->restoreErrorHandlers();
         }
 
@@ -101,12 +102,18 @@ class KernelTest extends TestCase
      * An Action that declares only the Request is still routable. The
      * skeleton's generated Actions take both, but nothing forces an
      * application's to.
+     *
+     * Two requests on purpose: each builds a Kernel, and tearDown() has to
+     * unwind their error handlers last-in-first-out or PHPUnit reports the
+     * pair left behind as risky. This was split into two tests once to make
+     * that go away instead of fixing the order.
      */
     public function testAnActionThatTakesOnlyTheRequestIgnoresTheServices(): void
     {
         $this->router->get('/greet', \TetherPHP\Tests\Fixtures\app\Actions\Greet::class);
 
         $this->assertSame('hello world', $this->get('/greet', 'unused')->body());
+        $this->assertSame('hello world', $this->get('/greet')->body());
     }
 
     public function testAMatchedRouteReturnsTheActionsResponse(): void

@@ -54,7 +54,8 @@ class CsrfProtectionTest extends TestCase
     {
         unset($_SERVER['HTTP_X_CSRF_TOKEN']);
 
-        foreach ($this->kernels as $kernel) {
+        // last in, first out: a Kernel only removes its handler when it is on top
+        foreach (array_reverse($this->kernels) as $kernel) {
             $kernel->restoreErrorHandlers();
         }
 

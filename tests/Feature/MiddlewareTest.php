@@ -47,7 +47,8 @@ class MiddlewareTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach ($this->kernels as $kernel) {
+        // last in, first out: a Kernel only removes its handler when it is on top
+        foreach (array_reverse($this->kernels) as $kernel) {
             $kernel->restoreErrorHandlers();
         }
 
