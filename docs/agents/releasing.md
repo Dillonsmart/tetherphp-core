@@ -18,6 +18,15 @@ split — a tag is the release.
    `core_dir()` must land inside `vendor/dillonsmart/tetherphp-core/src/framework` and the stub must exist.
 3. `php tether help` in the skeleton lists every built-in command — a command that fails `class_exists()` or the
    `Command` subclass check vanishes silently rather than erroring.
+4. **`CHANGELOG.md` has the entry, in the release commit.** Move what is under `[Unreleased]` to a `[X.Y.Z] — date`
+   heading, add the compare link at the bottom, and write the entry the way the file already reads: what changed
+   for a consumer, under `Added` / `Changed` / `Fixed` / `Removed`, with a `Breaking` heading on any minor that
+   breaks. The commit body carries the reasoning; the changelog carries the consequence. A release without its entry
+   is the same defect as a guide that has drifted, and the commit that tags is the last chance to catch it — the tag
+   cannot be moved afterwards. A release that went out wrong gets its own honest entry too, as 0.3.0 and 0.10.1 have.
+
+Between releases, a change that a consumer would notice goes under `[Unreleased]` in the same commit as the change.
+Docs-only and test-only commits need no entry.
 
 ## Tagging
 
