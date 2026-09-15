@@ -12,6 +12,7 @@ use TetherPHP\framework\Modules\Log;
 use TetherPHP\framework\Interfaces\MiddlewareInterface;
 use TetherPHP\Kernel;
 use TetherPHP\Router;
+use TetherPHP\Tests\Fixtures\app\Services;
 use TetherPHP\Tests\Fixtures\app\Actions\Echoes;
 use TetherPHP\Tests\Fixtures\KernelWithBody;
 
@@ -65,8 +66,10 @@ class CrudTest extends TestCase
 
         $kernel = new KernelWithBody(
             $this->router,
-            new Env(['APP_NAME' => 'TetherPHP Tests', 'APP_DEBUG' => 'false']),
-            new Log(sys_get_temp_dir() . '/tether-crud-test-logs'),
+            new Services(
+                new Env(['APP_NAME' => 'TetherPHP Tests', 'APP_DEBUG' => 'false']),
+                new Log(sys_get_temp_dir() . '/tether-crud-test-logs'),
+            ),
             $middleware,
         );
 

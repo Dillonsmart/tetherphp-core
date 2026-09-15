@@ -7,6 +7,7 @@ namespace TetherPHP\framework\Traits;
 use TetherPHP\framework\Interfaces\ActionInterface;
 use TetherPHP\framework\Interfaces\DomainResult;
 use TetherPHP\framework\Interfaces\MiddlewareInterface;
+use TetherPHP\framework\Interfaces\ServicesInterface;
 use TetherPHP\framework\Modules\Env;
 use TetherPHP\framework\Modules\Log;
 use TetherPHP\Router;
@@ -353,5 +354,90 @@ trait InspectsApplication
     protected function isRoutable(string $class): bool
     {
         return class_exists($class) && is_subclass_of($class, ActionInterface::class);
+    }
+
+    /**
+     * The services class the application hands its Actions, if it has one.
+     *
+     * Found from the code rather than by name: the framework must not name an
+     * application namespace, so it looks at what the routed Actions declare
+     * and takes the first constructor parameter typed as a ServicesInterface.
+     * The Kernel passes one object to every Action, so the first is the only.
+     *
+     * Reflection only. The object is built in `public/index.php`, which these
+     * commands must not load, and constructing it here would open whatever
+     * connections the application opens.
+     *
+     * @return array{class: class-string, file: ?string, provides: array<string, string>}|null
+     */
+    protected function applicationServices(Router $router): ?array
+    {
+        foreach ($this->routeList($router) as $route) {
+            if (!$this->isRoutable($route['action'])) {
+                continue;
+            }
+
+            /** @var class-string $action isRoutable() checked class_exists() */
+            $action = $route['action'];
+
+            $class = $this->servicesClassOf($action);
+
+            if ($class !== null) {
+                return [
+                    'class' => $class,
+                    'file' => $this->classFile($class),
+                    'provides' => $this->servicesProvidedBy($class),
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param class-string $action
+     *
+     * @return class-string|null
+     */
+    private function servicesClassOf(string $action): ?string
+    {
+        $constructor = new \ReflectionClass($action)->getConstructor();
+
+        foreach ($constructor?->getParameters() ?? [] as $parameter) {
+            $type = $parameter->getType();
+
+            if (!$type instanceof \ReflectionNamedType || $type->isBuiltin()) {
+                continue;
+            }
+
+            /** @var class-string $name */
+            $name = $type->getName();
+
+            if (is_subclass_of($name, ServicesInterface::class)) {
+                return $name;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * What a services class offers: its public properties, by name and type.
+     *
+     * @param class-string $class
+     *
+     * @return array<string, string>
+     */
+    protected function servicesProvidedBy(string $class): array
+    {
+        $provides = [];
+
+        foreach (new \ReflectionClass($class)->getProperties(\ReflectionProperty::IS_PUBLIC) as $property) {
+            $type = $property->getType();
+
+            $provides[$property->getName()] = $type instanceof \ReflectionNamedType ? $type->getName() : 'mixed';
+        }
+
+        return $provides;
     }
 }

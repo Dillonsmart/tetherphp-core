@@ -10,6 +10,7 @@ use TetherPHP\framework\Exceptions\HttpNotFoundException;
 use TetherPHP\framework\Http\Response;
 use TetherPHP\framework\Interfaces\ActionInterface;
 use TetherPHP\framework\Interfaces\MiddlewareInterface;
+use TetherPHP\framework\Interfaces\ServicesInterface;
 use TetherPHP\framework\Modules\Env;
 use TetherPHP\framework\Modules\Log;
 use TetherPHP\framework\Requests\Request;
@@ -25,18 +26,22 @@ class Kernel
     private ?\Closure $exceptionHandler = null;
 
     /**
-     * The environment and the log arrive as arguments rather than being found.
+     * What the application is made of arrives as one argument rather than
+     * being found.
      *
-     * Both used to be reached statically from inside the request — `Env` built
-     * itself from project_root() on first use, `Log` wrote to storage_dir()
-     * with no way to say otherwise. What the Kernel needs to do its job now
-     * comes through its constructor, and `public/index.php` is where a reader
-     * can see which environment file and which log directory are in play.
+     * The Env and the Log used to be reached statically from inside the
+     * request — `Env` built itself from project_root() on first use, `Log`
+     * wrote to storage_dir() with no way to say otherwise. Then they were two
+     * constructor arguments of their own, and when the services object arrived
+     * beside them the same Env was handed over twice. Now the Kernel takes the
+     * application's services and reads the two it runs on off that, and
+     * `public/index.php` is where a reader can see which environment file,
+     * which log directory and which connections are in play, each built once.
      *
-     * Installing them for the `env()` and `logger()` helpers is the one side
-     * effect here, and it is deliberate: application code in a view or a Domain
-     * should not have to thread an object through to read a setting. Those two
-     * functions are the only readers of `Env::current()` and `Log::current()`.
+     * Installing the Env and the Log for the `env()` and `logger()` helpers is
+     * the one side effect here, and it is deliberate: a view should not have to
+     * be threaded an object to read a setting. Those two functions are the only
+     * readers of `Env::current()` and `Log::current()`.
      *
      * Middleware is the seam everything else composes onto. It arrives as a
      * list rather than being discovered, so the order things run in is the
@@ -48,18 +53,22 @@ class Kernel
      * that does not — a token-authenticated API — boots without a session at
      * all, which was previously impossible.
      *
+     * The Kernel carries the services to every Action without looking past
+     * `env` and `log`. What a Domain needs beyond the Request — a connection, a
+     * mailer, a clock — is the application's business, declared on its own
+     * services class and handed down by its Actions.
+     *
      * @param list<MiddlewareInterface> $middleware
      *
      * @throws \Exception
      */
     public function __construct(
         protected Router $router,
-        protected Env $env,
-        protected Log $log,
+        protected ServicesInterface $services,
         protected array $middleware = [],
     ) {
-        Env::use($this->env);
-        Log::use($this->log);
+        Env::use($this->services->env);
+        Log::use($this->services->log);
 
         $this->setErrorHandler();
     }
@@ -80,8 +89,8 @@ class Kernel
         } catch (HttpException $e) {
             return $this->exceptionResponse($e);
         } catch (\Throwable $e) {
-            $this->log->error('Uncaught: ' . $e->getMessage());
-            $this->log->error($e->getTraceAsString());
+            $this->services->log->error('Uncaught: ' . $e->getMessage());
+            $this->services->log->error($e->getTraceAsString());
 
             return $this->exceptionResponse(new HttpInternalServerErrorException());
         }
@@ -195,15 +204,18 @@ class Kernel
     private function invoke(Route $route): Response
     {
         if (!class_exists($route->action)) {
-            $this->log->error("Route points at {$route->action}, which does not exist.");
+            $this->services->log->error("Route points at {$route->action}, which does not exist.");
 
             throw new HttpInternalServerErrorException('The route points at an action that does not exist.');
         }
 
-        $action = new $route->action($this->request);
+        // every Action is handed the Request and the services; one that
+        // declares only the Request ignores the second argument, as PHP lets
+        // any userland constructor do
+        $action = new $route->action($this->request, $this->services);
 
         if (!$action instanceof ActionInterface) {
-            $this->log->error(sprintf(
+            $this->services->log->error(sprintf(
                 '%s must implement %s to be routable.',
                 $route->action,
                 ActionInterface::class,
@@ -278,7 +290,7 @@ class Kernel
         $file = views_dir() . str_replace('.', '/', $view) . '.php';
 
         if (!file_exists($file)) {
-            $this->log->error("View route points at {$view}, which does not exist.");
+            $this->services->log->error("View route points at {$view}, which does not exist.");
 
             throw new HttpInternalServerErrorException('The route points at a view that does not exist.');
         }
@@ -430,7 +442,7 @@ class Kernel
 
     private function setErrorHandler(): void
     {
-        if ($this->env->get('APP_DEBUG') === 'true') {
+        if ($this->services->env->get('APP_DEBUG') === 'true') {
             error_reporting(E_ALL);
             ini_set('display_errors', '1');
         } else {
@@ -439,7 +451,7 @@ class Kernel
         }
 
         $this->errorHandler = function ($errno, $errstr, $errfile, $errline) {
-            $this->log->error("Error [$errno]: $errstr in $errfile on line $errline");
+            $this->services->log->error("Error [$errno]: $errstr in $errfile on line $errline");
 
             // Notices, warnings and deprecations are logged, not fatal. Replacing
             // the page with a 500 because something was deprecated hides the real
@@ -454,8 +466,8 @@ class Kernel
         };
 
         $this->exceptionHandler = function ($exception) {
-            $this->log->error("Uncaught Exception: " . $exception->getMessage());
-            $this->log->error("Uncaught Exception: " . $exception->getTraceAsString());
+            $this->services->log->error("Uncaught Exception: " . $exception->getMessage());
+            $this->services->log->error("Uncaught Exception: " . $exception->getTraceAsString());
 
             $this->renderFatalError();
         };

@@ -15,6 +15,7 @@ return function (Router $router): void {
     $router->get('/greet', TetherPHP\Tests\Fixtures\app\Actions\Greet::class);
     $router->get('/greet/{name}', TetherPHP\Tests\Fixtures\app\Actions\Greet::class);
     $router->post('/save', TetherPHP\Tests\Fixtures\app\Actions\Greet::class);
+    $router->get('/sign', TetherPHP\Tests\Fixtures\app\Actions\Signs::class);
     $router->get('/broken', 'Actions\DoesNotExist');
     $router->get('/nope', TetherPHP\Tests\Fixtures\app\Actions\NotAnAction::class);
     $router->view('/static', 'errors.404');

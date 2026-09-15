@@ -52,18 +52,26 @@ fails once the package is installed under `vendor/` — `tests/Unit/GlobalFuncti
 
 ## What the Kernel is given
 
-`Kernel::__construct(Router $router, Env $env, Log $log)`. The environment file and the log directory are chosen by
-the application in `public/index.php`, not found by the framework — `Env::getInstance()` and the static `Log` are
-gone as of `v0.8.0`.
+`Kernel::__construct(Router $router, ServicesInterface $services, array $middleware = [])`. The services are the
+application's own class — what it is made of, built in `public/index.php` — and `ServicesInterface` names the two
+things the Kernel runs on: `public Env $env` and `public Log $log`. The environment file and the log directory are
+chosen there, not found by the framework — `Env::getInstance()` and the static `Log` are gone as of `v0.8.0`, and
+the Kernel no longer takes either as an argument of its own, which handed the same `Env` over twice.
 
 The Kernel installs both for the `env()` and `logger()` helpers, which are one-line delegates and the **only**
 callers of `Env::current()` / `Log::current()`. A framework class reaching for `current()` instead of taking the
 object through its constructor is a review failure. The global functions are a closed list of ten, documented with a
 reason each in [`docs/agents/framework.md`](docs/agents/framework.md#the-global-functions-are-a-closed-list).
 
+**Services are how a Domain gets a dependency.** The Kernel constructs every Action with `($request, $services)`.
+The Action hands its Domain the pieces the Domain asks for; the services object itself goes no further. Past `env`
+and `log` the framework never looks inside it and never names the application's class: `inspect` and `context`
+find it by reflecting the routed Actions' constructors. See
+[`docs/agents/framework.md`](docs/agents/framework.md#how-a-domain-gets-its-dependencies).
+
 ## Middleware is how anything composes in
 
-`Kernel::__construct(Router $router, Env $env, Log $log, array $middleware = [])`. A middleware is one method —
+`Kernel::__construct(Router $router, ServicesInterface $services, array $middleware = [])`. A middleware is one method —
 `__invoke(Request $request, \Closure $next): Response` — and the list is given, never discovered, so the order things
 run in is the order it is written in the application's `routes/middleware.php`.
 

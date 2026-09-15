@@ -51,6 +51,7 @@ class ContextCommand extends Command
             'pipeline' => ['Request', 'Route', 'Action', 'Domain', 'Responder', 'Response'],
             'conventions' => $this->conventions(),
             'middleware' => $this->middleware(),
+            'services' => $this->services($router),
             'routes' => $this->routes($router),
             'features' => $this->features($router),
             'commands' => $this->commands(),
@@ -115,6 +116,8 @@ class ContextCommand extends Command
                 . 'app/Views/pages/blog/index.php.',
             'rules' => [
                 'An Action implements ActionInterface and returns a Response.',
+                'An Action is constructed with the Request and the application\'s Services, '
+                . 'and hands its Domain the pieces the Domain asks for by constructor.',
                 'A Domain returns a DomainResult and knows nothing about HTTP.',
                 'A Responder names the view variables; a Result is named for the domain.',
                 'Route URIs are matched lowercased, so routing is case-insensitive.',
@@ -149,6 +152,36 @@ class ContextCommand extends Command
             'wraps' => 'routing and the action, outermost first',
             'names' => $names,
             'problem' => $problem,
+        ];
+    }
+
+    /**
+     * What the application hands its Actions, and so what a Domain can be given.
+     *
+     * An agent adding a feature needs to know whether there is a database
+     * connection to ask for and what it is called. That is declared in one
+     * class, and this reports it without constructing it.
+     *
+     * @return array<string, mixed>
+     */
+    private function services(Router $router): array
+    {
+        $services = $this->applicationServices($router);
+
+        if ($services === null) {
+            return [
+                'class' => null,
+                'file' => null,
+                'provides' => [],
+                'note' => 'No routed Action takes a ServicesInterface. Domains can only be handed the Request.',
+            ];
+        }
+
+        return [
+            'class' => $services['class'],
+            'file' => $services['file'],
+            'provides' => $services['provides'],
+            'note' => 'Built in public/index.php and handed to every Action; an Action passes a Domain the pieces it needs.',
         ];
     }
 

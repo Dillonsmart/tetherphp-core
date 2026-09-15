@@ -14,6 +14,7 @@ use TetherPHP\framework\Sessions\CsrfToken;
 use TetherPHP\framework\Sessions\Session;
 use TetherPHP\Kernel;
 use TetherPHP\Router;
+use TetherPHP\Tests\Fixtures\app\Services;
 use TetherPHP\Tests\Fixtures\app\Actions\Greet;
 use TetherPHP\Tests\Fixtures\KernelWithBody;
 
@@ -82,8 +83,7 @@ class CsrfProtectionTest extends TestCase
 
         $kernel = new Kernel(
             $this->router,
-            new Env(['APP_DEBUG' => 'false']),
-            $log,
+            new Services(new Env(['APP_DEBUG' => 'false']), $log),
             [new VerifyCsrfToken($this->session, $log)],
         );
 
@@ -214,8 +214,7 @@ class CsrfProtectionTest extends TestCase
 
         $kernel = new Kernel(
             $this->router,
-            new Env(['APP_DEBUG' => 'false']),
-            new Log(sys_get_temp_dir() . '/tether-csrf-test-logs'),
+            new Services(new Env(['APP_DEBUG' => 'false']), new Log(sys_get_temp_dir() . '/tether-csrf-test-logs')),
         );
 
         $this->kernels[] = $kernel;
@@ -240,8 +239,10 @@ class CsrfProtectionTest extends TestCase
 
         $kernel = new KernelWithBody(
             $this->router,
-            new Env(['APP_NAME' => 'TetherPHP Tests', 'APP_DEBUG' => 'false']),
-            new Log(sys_get_temp_dir() . '/tether-csrf-test-logs'),
+            new Services(
+                new Env(['APP_NAME' => 'TetherPHP Tests', 'APP_DEBUG' => 'false']),
+                new Log(sys_get_temp_dir() . '/tether-csrf-test-logs'),
+            ),
             [new VerifyCsrfToken($this->session, new Log(sys_get_temp_dir() . '/tether-csrf-test-logs'))],
         );
 
@@ -265,8 +266,10 @@ class CsrfProtectionTest extends TestCase
 
         $kernel = new KernelWithBody(
             $this->router,
-            new Env(['APP_NAME' => 'TetherPHP Tests', 'APP_DEBUG' => 'false']),
-            new Log(sys_get_temp_dir() . '/tether-csrf-test-logs'),
+            new Services(
+                new Env(['APP_NAME' => 'TetherPHP Tests', 'APP_DEBUG' => 'false']),
+                new Log(sys_get_temp_dir() . '/tether-csrf-test-logs'),
+            ),
             [new VerifyCsrfToken($this->session, new Log(sys_get_temp_dir() . '/tether-csrf-test-logs'))],
         );
 

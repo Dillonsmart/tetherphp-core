@@ -26,7 +26,7 @@ src/
     ├── Exceptions/     # HttpException and its status subclasses
     ├── Helpers/        # GlobalFunctions.php (Composer `files`), Route
     ├── Http/           # Response
-    ├── Interfaces/     # ActionInterface, DomainResult, MiddlewareInterface, RequestInterface, ResponderInterface
+    ├── Interfaces/     # ActionInterface, DomainResult, MiddlewareInterface, RequestInterface, ResponderInterface, ServicesInterface
     ├── Middleware/      # VerifyCsrfToken, OverridesMethod
     ├── Modules/        # Console, Input, Env, Log
     ├── Requests/       # Request
@@ -73,8 +73,14 @@ more readability than it buys.
 | Function                                                | Delegates to                          | Why it exists                                                        |
 | ------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------- |
 | `project_root()`, `package_root()`, `core_dir()`, `core_views()`, `app_dir()`, `storage_dir()`, `views_dir()`, `public_dir()` | Composer's `InstalledVersions`, or `__DIR__` | Pure functions of where the code is installed. They derive a path; they hold nothing and nothing can change them. |
-| `env($key, $default = null)`                             | `Env::current()->get()`                | A view or a Domain reading one setting should not have to be handed an `Env` to do it. |
+| `env($key, $default = null)`                             | `Env::current()->get()`                | A view reading one setting should not have to be handed an `Env` to do it. |
 | `logger($message, $level)`                               | `Log::current()->error()` / `->info()` | The same argument, for the same reason.                              |
+
+A **Domain** does not get the same allowance. It is constructed by an Action, which is handed the application's
+services, so an `Env` or a `Log` a Domain needs arrives through its constructor like any other dependency — see
+[How a Domain gets its dependencies](#how-a-domain-gets-its-dependencies). The skeleton's `Domains\Home\Index` used
+to call `env()`, and its unit test had to install a global with `Env::use()` before it could construct a class that
+"knows nothing about HTTP". Views keep `env()` because a template is not constructed by anything.
 
 Only `env()` and `logger()` touch state, and both are **one-line delegates to an object the Kernel installed** —
 they make no decision the object does not, and they cannot be the place a bug hides. `Env::current()` and
@@ -306,6 +312,12 @@ constructs its own in its constructor and may use anything. The Result is the ex
 because it came from the code. The commands report what is on disk under the
 conventional name, and mark what is missing.
 
+**The services class is read the same way.** `context` carries a `services` entry — the class, its file and what
+it provides as `name: type` — and `inspect` on that class says so and lists them. Both find it by reflecting the
+routed Actions' constructors for a parameter typed as a `ServicesInterface`, because the framework must not name an
+application class, and neither constructs it: it is built in `public/index.php`, and building it would open whatever
+the application opens.
+
 `context` writes JSON to stdout and nothing else, so it can be piped. Its contract is the done-when for Phase 4 of
 the roadmap — an agent given only that output should be able to say where a new feature's files belong and which
 route would conflict — and `tests/Feature/IntrospectionTest.php` asserts the keys that promise depends on.
@@ -394,6 +406,100 @@ see a response.
 - **Domains return a `DomainResult`, never an array.** See below — this is the
   one part of the pipeline the framework constrains by type without owning any
   of the classes involved.
+- **Every Action is constructed with `($request, $services)`.** The second is
+  the application's own object, built in `public/index.php` and the thing the
+  Kernel itself was given; see the next section. An Action that declares only
+  the Request ignores it.
+
+## How a Domain gets its dependencies
+
+An Action is constructed by the Kernel, so anything a Domain needs beyond the
+Request — a database connection, a mailer, a clock — has to reach the Action
+first, and there was no way for it to. The only route in was a
+global such as `env()`, which is a service locator with a two-word vocabulary,
+and an application that needed a third word would have written its own.
+
+The answer is not a container. It is one object, owned by the application,
+that says what the application is made of — and the Env and the Log are two of
+those things, so it is what the Kernel is given too:
+
+```php
+// public/index.php
+$services = new Services(
+    env: Env::fromFile(__DIR__ . '/../.env'),
+    log: new Log(__DIR__ . '/../storage/logs'),
+);
+
+$middleware = (require __DIR__ . '/../routes/middleware.php')($services->env, $services->log);
+
+new Kernel($router, $services, $middleware)->run()->send();
+```
+
+```php
+// app/Services.php — the one list of what the application is made of
+final readonly class Services implements ServicesInterface
+{
+    public function __construct(
+        public Env $env,
+        public Log $log,
+    ) {
+    }
+}
+```
+
+`ServicesInterface` declares `public Env $env { get; }` and `public Log $log
+{ get; }` — an interface may declare properties as of PHP 8.4, and a plain
+promoted property satisfies one — because those are the two things the Kernel
+runs on: `APP_DEBUG` for error display, the log for what goes wrong, and both
+installed for the `env()` and `logger()` helpers. The Kernel took them as
+arguments of their own for one iteration of this design, beside a services
+object that also contained them, and handing the same `Env` over twice was
+the sign that the object should be the argument.
+
+The Kernel constructs every Action as `new $action($request, $services)` and
+looks no further than those two properties. The Action hands its Domain the
+pieces the Domain asks for:
+
+```php
+public function __construct(protected Request $request, Services $services)
+{
+    $this->domain = new IndexDomain($services->env);
+    $this->responder = new IndexResponder($request);
+}
+```
+
+Four rules, and the shape depends on all of them:
+
+- **A Domain takes what it needs, never the services object.** `Domains\Post\Store`
+  declares `PDO $db` and a unit test builds one with an in-memory SQLite. A
+  Domain that took `Services` would depend on everything and say nothing.
+- **Everything is built in `public/index.php`.** An application adds
+  `public PDO $db` to `Services` and `db: new PDO(...)` to the file that boots
+  it; a reader answers "what is this application made of?" from one class and
+  "how is it configured?" from one file. If something is expensive to build and
+  rarely used, make *that thing* connect on first use — which is what `Session`
+  does — rather than making the wiring lazy.
+- **The framework never names the application's class.** Past `env` and
+  `log`, `ServicesInterface` declares nothing: the Kernel needs a type to carry
+  and the console needs a role to recognise, and what else an application is
+  made of is its own business. `inspect` and `context` find the class by
+  reflecting the routed Actions' constructors, and they never construct it —
+  it is built in the one file they must not load.
+- **Every application has one.** There is no Kernel without services, because
+  the Env and the Log live there. A test builds one the way `public/index.php`
+  does; the core fixture's has the two required properties and one of its own.
+  An Action that takes only the Request is still routable; PHP lets a userland
+  constructor ignore an argument it did not declare.
+
+`tether make:*` writes the Action with `Services $services` in its signature,
+so the place a dependency comes from is in every generated file rather than
+discovered later.
+
+What this does not cover: `routes/middleware.php` still takes `(Env, Log)`,
+because the console builds that list to report it and cannot build the
+application's services; `public/index.php` passes it `$services->env` and
+`$services->log`. A middleware that needs a connection has no explicit route
+to one yet.
 
 ## Middleware: the composition seam
 

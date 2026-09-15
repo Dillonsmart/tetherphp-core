@@ -11,6 +11,7 @@ use TetherPHP\framework\Modules\Env;
 use TetherPHP\framework\Modules\Log;
 use TetherPHP\Kernel;
 use TetherPHP\Router;
+use TetherPHP\Tests\Fixtures\app\Services;
 use TetherPHP\Tests\Fixtures\app\Actions\Greet;
 use TetherPHP\Tests\Fixtures\app\Middleware\AddsHeader;
 use TetherPHP\Tests\Fixtures\app\Middleware\Records;
@@ -63,8 +64,7 @@ class MiddlewareTest extends TestCase
 
         $kernel = new Kernel(
             $this->router,
-            new Env(['APP_DEBUG' => 'false']),
-            new Log(sys_get_temp_dir() . '/tether-middleware-test-logs'),
+            new Services(new Env(['APP_DEBUG' => 'false']), new Log(sys_get_temp_dir() . '/tether-middleware-test-logs')),
             $middleware,
         );
 

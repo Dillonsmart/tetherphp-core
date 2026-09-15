@@ -159,6 +159,15 @@ class IntrospectionTest extends TestCase
         $this->assertStringContainsString('ActionInterface', $output);
     }
 
+    public function testInspectRecognisesTheServicesAndListsWhatTheyProvide(): void
+    {
+        $output = $this->capture(InspectCommand::class, \TetherPHP\Tests\Fixtures\app\Services::class);
+
+        $this->assertStringContainsString('Services — what the application hands its Actions', $output);
+        $this->assertStringContainsString('Provides', $output);
+        $this->assertStringContainsString('$signature: string', $output);
+    }
+
     public function testInspectReportsAClassItCannotFind(): void
     {
         $this->assertSame(
@@ -271,6 +280,27 @@ class IntrospectionTest extends TestCase
                 'TetherPHP\framework\Middleware\VerifyCsrfToken',
             ],
             $context['middleware']['names'],
+        );
+    }
+
+    /**
+     * Found by reflecting the routed Actions, not by naming a class: the
+     * framework cannot know what an application calls its services, and it
+     * must not build them to find out.
+     */
+    public function testContextCarriesTheServicesWithoutConstructingThem(): void
+    {
+        $context = json_decode($this->capture(ContextCommand::class), true);
+
+        $this->assertIsArray($context);
+        $this->assertSame(\TetherPHP\Tests\Fixtures\app\Services::class, $context['services']['class']);
+        $this->assertSame(
+            [
+                'env' => 'TetherPHP\framework\Modules\Env',
+                'log' => 'TetherPHP\framework\Modules\Log',
+                'signature' => 'string',
+            ],
+            $context['services']['provides'],
         );
     }
 

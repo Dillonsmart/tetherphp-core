@@ -7,6 +7,7 @@ namespace TetherPHP\framework\Commands;
 use TetherPHP\framework\Interfaces\ActionInterface;
 use TetherPHP\framework\Interfaces\DomainResult;
 use TetherPHP\framework\Interfaces\ResponderInterface;
+use TetherPHP\framework\Interfaces\ServicesInterface;
 use TetherPHP\framework\Traits\InspectsApplication;
 
 class InspectCommand extends Command
@@ -79,6 +80,10 @@ class InspectCommand extends Command
 
         $this->dependencies($reflection);
 
+        if (is_subclass_of($class, ServicesInterface::class)) {
+            $this->provides($class);
+        }
+
         if (is_subclass_of($class, ActionInterface::class)) {
             $this->triples($class);
         }
@@ -113,6 +118,7 @@ class InspectCommand extends Command
             is_subclass_of($class, ActionInterface::class) => 'Action — receives the Request, returns a Response',
             is_subclass_of($class, DomainResult::class) => 'Result — the value object a Domain returns',
             is_subclass_of($class, ResponderInterface::class) => 'Responder — turns a result into a Response',
+            is_subclass_of($class, ServicesInterface::class) => 'Services — what the application hands its Actions',
             is_subclass_of($class, Command::class) => 'Command — console command',
             $this->looksLikeDomain($class) => 'Domain — business logic, no HTTP knowledge',
             default => 'not a TetherPHP role — no interface or base class identifies it',
@@ -164,6 +170,28 @@ class InspectCommand extends Command
             $name = $type instanceof \ReflectionNamedType ? $type->getName() : 'mixed';
 
             $this->line("          \${$parameter->getName()}: {$name}");
+        }
+    }
+
+    /**
+     * @param class-string $class
+     */
+    private function provides(string $class): void
+    {
+        $provides = $this->servicesProvidedBy($class);
+
+        $this->line();
+
+        if ($provides === []) {
+            $this->line('Provides  nothing — add a public property, and build it in public/index.php');
+
+            return;
+        }
+
+        $this->line('Provides');
+
+        foreach ($provides as $name => $type) {
+            $this->line("          \${$name}: {$type}");
         }
     }
 

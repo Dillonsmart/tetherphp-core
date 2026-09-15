@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Actions\{{feature}};
 
 use Actions\Action;
+use App\Services;
 use Domains\{{feature}}\{{operation}} as {{operation}}Domain;
 use Responders\{{feature}}\{{operation}} as {{operation}}Responder;
 use TetherPHP\framework\Http\Response;
@@ -13,8 +14,9 @@ use TetherPHP\framework\Requests\Request;
 
 class {{operation}} extends Action implements ActionInterface
 {
-    public function __construct(protected Request $request)
+    public function __construct(protected Request $request, Services $services)
     {
+        // hand the Domain what it needs from the request and from $services
         $this->domain = new {{operation}}Domain({{domainArguments}});
         $this->responder = new {{operation}}Responder($request);
     }

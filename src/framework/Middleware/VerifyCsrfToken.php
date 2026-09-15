@@ -26,7 +26,7 @@ use TetherPHP\framework\Sessions\Session;
  *
  *     $session = new Session();
  *
- *     new Kernel($router, $env, $log, [
+ *     new Kernel($router, $services, [
  *         new VerifyCsrfToken($session),
  *     ])->run()->send();
  *

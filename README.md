@@ -35,7 +35,7 @@ src/
     ├── Exceptions/     # HttpException and the statuses that subclass it
     ├── Helpers/        # Global functions and the Route view helper
     ├── Http/           # Response
-    ├── Interfaces/     # ActionInterface, DomainResult, MiddlewareInterface, RequestInterface, ResponderInterface
+    ├── Interfaces/     # ActionInterface, DomainResult, MiddlewareInterface, RequestInterface, ResponderInterface, ServicesInterface
     ├── Middleware/     # VerifyCsrfToken, OverridesMethod
     ├── Modules/        # Console, Input, Env, Log
     ├── Requests/       # Request

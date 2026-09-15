@@ -82,6 +82,24 @@ class MakeFeatureTest extends TestCase
     }
 
     /**
+     * A generated Action is offered the application's services beside the
+     * Request, so the place a Domain's dependencies come from is written into
+     * every Action rather than discovered later.
+     */
+    public function testTheActionTakesTheServicesBesideTheRequest(): void
+    {
+        $this->generate(MakeFeatureCommand::class, self::FEATURE);
+
+        $action = (string) file_get_contents(app_dir() . '/Actions/Gadget/Index.php');
+
+        $this->assertStringContainsString('use App\Services;', $action);
+        $this->assertStringContainsString(
+            'public function __construct(protected Request $request, Services $services)',
+            $action,
+        );
+    }
+
+    /**
      * The Result sits beside the Domain that returns it, so one feature owns
      * one directory under `Domains/` rather than two — and it is named for its
      * shape, so a second operation answering the same way reuses it.

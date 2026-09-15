@@ -10,6 +10,7 @@ use TetherPHP\framework\Modules\Env;
 use TetherPHP\framework\Modules\Log;
 use TetherPHP\Kernel;
 use TetherPHP\Router;
+use TetherPHP\Tests\Fixtures\app\Services;
 
 /**
  * The Kernel had no test coverage at all until it stopped calling exit().
@@ -51,12 +52,17 @@ class KernelTest extends TestCase
      * A test can now state the settings it is exercising — APP_DEBUG here —
      * without writing a .env file into the repository.
      */
-    private function kernel(): Kernel
+    private function kernel(string $signature = ''): Kernel
     {
-        $kernel = new Kernel($this->router, $this->env(), $this->log());
+        $kernel = new Kernel($this->router, $this->services($signature));
         $this->kernels[] = $kernel;
 
         return $kernel;
+    }
+
+    private function services(string $signature = ''): Services
+    {
+        return new Services($this->env(), $this->log(), $signature);
     }
 
     private function env(): Env
@@ -69,12 +75,38 @@ class KernelTest extends TestCase
         return new Log(sys_get_temp_dir() . '/tether-kernel-test-logs');
     }
 
-    private function get(string $uri): Response
+    private function get(string $uri, string $signature = ''): Response
     {
         $_SERVER['REQUEST_METHOD'] = 'GET';
         $_SERVER['REQUEST_URI'] = $uri;
 
-        return $this->kernel()->run();
+        return $this->kernel($signature)->run();
+    }
+
+    /**
+     * The object built in public/index.php is the object an Action receives —
+     * the Kernel carries it and looks no further into it.
+     */
+    public function testTheServicesTheKernelIsGivenReachTheAction(): void
+    {
+        $this->router->get('/sign', \TetherPHP\Tests\Fixtures\app\Actions\Signs::class);
+
+        $response = $this->get('/sign', 'the fixture');
+
+        $this->assertSame(200, $response->status());
+        $this->assertSame('signed by the fixture', $response->body());
+    }
+
+    /**
+     * An Action that declares only the Request is still routable. The
+     * skeleton's generated Actions take both, but nothing forces an
+     * application's to.
+     */
+    public function testAnActionThatTakesOnlyTheRequestIgnoresTheServices(): void
+    {
+        $this->router->get('/greet', \TetherPHP\Tests\Fixtures\app\Actions\Greet::class);
+
+        $this->assertSame('hello world', $this->get('/greet', 'unused')->body());
     }
 
     public function testAMatchedRouteReturnsTheActionsResponse(): void
@@ -213,7 +245,7 @@ class KernelTest extends TestCase
     {
         $before = get_error_handler();
 
-        $kernel = new Kernel($this->router, $this->env(), $this->log());
+        $kernel = new Kernel($this->router, $this->services());
         $this->assertNotSame($before, get_error_handler(), 'the Kernel should install its handler');
 
         $kernel->restoreErrorHandlers();
@@ -226,7 +258,7 @@ class KernelTest extends TestCase
      */
     public function testItDoesNotRemoveAHandlerInstalledAfterIt(): void
     {
-        $kernel = new Kernel($this->router, $this->env(), $this->log());
+        $kernel = new Kernel($this->router, $this->services());
 
         $mine = static fn (): bool => true;
         set_error_handler($mine);
