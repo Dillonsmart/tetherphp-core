@@ -239,6 +239,14 @@ app/
   that differed from each other by their class name and nothing else. Every operation of a feature that answers the
   same way returns the same Result, so `writeSharedStub()` reuses an existing one instead of failing on it — the one
   place a generator treats "already there" as normal rather than as an error.
+- **At the root of a feature's Domain namespace, a verb is an operation and a noun is a collaborator.**
+  `Domains\Note\Store` is an operation: it has an Action and a Responder at the same path under the other two
+  roots, a route points at the Action, and the console finds all three from any one of them. `Domains\Note\Notes`
+  and `Domains\Note\Attributes` are collaborators: shared by the operations, handed to them by the Action, and
+  routed to by nothing. They live beside the operations rather than under a subdirectory because the operations are
+  the domain, and moving either kind would break the one-to-one path the tooling and the generators rest on. A
+  subdirectory is for a *kind* of thing that comes in numbers, which is why `Results/` is one; a feature that grows
+  enough collaborators to need the same gives *them* the directory, never the operations.
 
 `InspectsApplication::conventionalResultClass()` still reports the old bucket for a flat action name whose Result is
 actually there, because an application generated before this change has its results in it and the introspection
