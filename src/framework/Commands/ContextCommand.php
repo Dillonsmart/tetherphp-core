@@ -98,7 +98,7 @@ class ContextCommand extends Command
             'directories' => [
                 'actions' => 'app/Actions',
                 'domains' => 'app/Domains',
-                'results' => 'app/Domains/Results',
+                'results' => 'app/Domains/<Feature>/Results',
                 'responders' => 'app/Responders',
                 'views' => 'app/Views',
                 'commands' => 'app/Commands',
@@ -107,29 +107,32 @@ class ContextCommand extends Command
             'namespaces' => [
                 'actions' => 'Actions',
                 'domains' => 'Domains',
-                'results' => 'Domains\\Results',
+                'results' => 'Domains\\<Feature>\\Results',
                 'responders' => 'Responders',
                 'commands' => 'Commands',
             ],
-            'naming' => 'One name per feature in PascalCase. Actions\\Blog, Domains\\Blog, '
-                . 'Domains\\Results\\Blog and Responders\\Blog are one feature; its view is '
-                . 'app/Views/pages/blog/index.php.',
+            'naming' => 'Every feature is a directory, named in PascalCase, and each operation is a class '
+                . 'inside it: Actions\\Blog\\Show, Domains\\Blog\\Show and Responders\\Blog\\Show are one '
+                . 'operation of the Blog feature, and its view is app/Views/pages/blog/show.php. A Result is '
+                . 'named for its shape and shared by the operations that answer the same way: '
+                . 'Domains\\Blog\\Results\\Record.',
             'rules' => [
                 'An Action implements ActionInterface and returns a Response.',
                 'An Action is constructed with the Request and the application\'s Services, '
                 . 'and hands its Domain the pieces the Domain asks for by constructor.',
                 'A Domain returns a DomainResult and knows nothing about HTTP.',
-                'A Responder names the view variables; a Result is named for the domain.',
-                'Route URIs are matched lowercased, so routing is case-insensitive.',
+                'A Responder names the view variables; a Result is named for its shape, not its operation.',
+                'Routes match case-insensitively; a captured parameter arrives exactly as it was sent.',
                 'A static route wins over a dynamic route of the same shape.',
                 'A dynamic route only matches a URI with the same number of segments.',
                 'End a request early by throwing an HttpException.',
             ],
             'generate' => [
                 'feature' => 'tether make:feature <name>',
-                'action' => 'tether make:action <name>',
-                'domain' => 'tether make:domain <name>',
-                'responder' => 'tether make:responder <name>',
+                'resource' => 'tether make:resource <name> [--uri=<base>]',
+                'action' => 'tether make:action <feature> <operation>',
+                'domain' => 'tether make:domain <feature> <operation>',
+                'responder' => 'tether make:responder <feature> <operation>',
                 'command' => 'tether make:command <name>',
             ],
         ];
