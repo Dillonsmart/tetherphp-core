@@ -236,6 +236,41 @@ class StubsTest extends TestCase
      * The generated update and delete forms are the reason OverridesMethod
      * exists: a browser form can only send GET or POST.
      */
+    /**
+     * The Responder names the view's variables and the view receives them by
+     * extract(), so nothing in the template declares them and an IDE flags
+     * every one as undefined. A @var docblock at the top is the view's side
+     * of that contract, and it is written by the same generator as the
+     * Responder that names them, so the two cannot drift.
+     */
+    public function testEveryViewDeclaresTheVariablesItsResponderNames(): void
+    {
+        $pairs = [
+            'ResponderPage' => 'ViewPage',
+            'ResponderCollection' => 'ViewIndex',
+            'ResponderRecord' => 'ViewShow',
+        ];
+
+        foreach ($pairs as $responder => $view) {
+            preg_match_all("/'([a-zA-Z]+)' => /", $this->stub($responder), $named);
+            $stub = $this->stub($view);
+
+            $this->assertStringStartsWith('<?php', $stub, "{$view} must open with the @var docblock");
+
+            foreach ($named[1] as $variable) {
+                $this->assertMatchesRegularExpression(
+                    '/@var \S+(?: \S+)*\s+\$' . $variable . '\b/',
+                    $stub,
+                    "{$view} does not declare \${$variable}, which {$responder} passes it",
+                );
+            }
+        }
+
+        // the form is rendered by the same Responder as the show page
+        $this->assertStringContainsString('@var string               $id', $this->stub('ViewForm'));
+        $this->assertStringContainsString('$attributes', $this->stub('ViewForm'));
+    }
+
     public function testTheGeneratedFormsDeclareTheVerbTheyMean(): void
     {
         $this->assertStringContainsString('name="_method" value="PUT"', $this->stub('ViewForm'));

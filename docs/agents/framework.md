@@ -169,7 +169,7 @@ more. `Command.txt` is the exception, because a console command is not an ADR tr
 | `ResultPage.txt` / `ResultCollection.txt` / `ResultRecord.txt` / `ResultWritten.txt` | the four result shapes — each renders a class named for the shape, not the operation |
 | `ResponderPage.txt` / `ResponderCollection.txt` / `ResponderRecord.txt` | a Responder that renders |
 | `ResponderRedirect.txt` | a Responder that redirects — what a write answers with |
-| `ViewPage.txt` / `ViewIndex.txt` / `ViewShow.txt` / `ViewForm.txt` | the templates |
+| `ViewPage.txt` / `ViewIndex.txt` / `ViewShow.txt` / `ViewForm.txt` | the templates — each opens with a `@var` docblock declaring the variables its Responder passes |
 | `Command.txt` | `make:command` |
 
 | Placeholder            | Substituted by | Used in |
@@ -187,6 +187,13 @@ more. `Command.txt` is the exception, because a console command is not an ADR tr
 | `{{redirect}}`         | `make:resource`        | `ResponderRedirect.txt` |
 | `{{className}}`        | `make:command`         | `Command.txt` only |
 | `{{commandName}}`      | `make:command`         | `Command.txt` |
+
+**Every view stub opens with a `@var` docblock** naming the variables its Responder stub passes. A view receives
+its variables by `extract()`, so nothing in the template declares them and an IDE marks every one undefined; the
+docblock is the view's side of the contract the Responder's array is the other side of. Both are written by the
+same generator, and `StubsTest::testEveryViewDeclaresTheVariablesItsResponderNames` reads the Responder stub's
+keys and asserts the view declares each, so adding a variable to one without the other fails. It is a promise
+rather than a check — a Responder that stops passing a variable still fails at render time, not before.
 
 A placeholder no generator substitutes is emitted literally into the developer's file, so the set is a contract —
 `tests/Unit/StubsTest.php` enforces it, and also enforces that no triple stub still uses `{{className}}`. Adding one

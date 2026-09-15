@@ -1,3 +1,11 @@
+<?php
+/**
+ * What Responders\{{feature}}\{{operation}} hands this view.
+ *
+ * @var list<array<string, mixed>> $records
+ * @var array<string, mixed>       $query
+ */
+?>
 <h1>{{feature}}</h1>
 
 <p><a href="{{uri}}/create">New {{feature}}</a></p>

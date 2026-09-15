@@ -1,3 +1,11 @@
+<?php
+/**
+ * What Responders\{{feature}}\{{operation}} hands this view.
+ *
+ * @var string               $id
+ * @var array<string, mixed> $attributes
+ */
+?>
 <h1><?php echo $id === '' ? 'New {{feature}}' : 'Edit {{feature}} ' . htmlspecialchars($id); ?></h1>
 
 <?php
