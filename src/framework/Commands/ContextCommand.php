@@ -128,12 +128,12 @@ class ContextCommand extends Command
                 'End a request early by throwing an HttpException.',
             ],
             'generate' => [
-                'feature' => 'tether make:feature <name>',
-                'resource' => 'tether make:resource <name> [--uri=<base>]',
-                'action' => 'tether make:action <feature> <operation>',
-                'domain' => 'tether make:domain <feature> <operation>',
-                'responder' => 'tether make:responder <feature> <operation>',
-                'command' => 'tether make:command <name>',
+                'feature' => 'php tether make:feature <name>',
+                'resource' => 'php tether make:resource <name> [--uri=<base>]',
+                'action' => 'php tether make:action <feature> <operation>',
+                'domain' => 'php tether make:domain <feature> <operation>',
+                'responder' => 'php tether make:responder <feature> <operation>',
+                'command' => 'php tether make:command <name>',
             ],
         ];
     }

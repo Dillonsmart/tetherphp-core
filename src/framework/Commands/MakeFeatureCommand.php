@@ -58,7 +58,7 @@ class MakeFeatureCommand extends Command
         $this->success("Feature '{$feature}' created.");
         $this->info("Route it with: \$router->get('{$uri}', Actions\\{$feature}\\Index::class);");
         $this->line();
-        $this->line("Add another page to it with 'tether make:action {$feature} <Operation>'.");
+        $this->line("Add another page to it with 'php tether make:action {$feature} <Operation>'.");
 
         return self::COMMAND_SUCCESS;
     }

@@ -77,7 +77,7 @@ class ExplainCommand extends Command
             $this->line();
             $this->error($this->label('Route') . 'no match — the Kernel throws HttpNotFoundException, which becomes a 404 Response.');
             $this->line();
-            $this->line("Run 'tether routes' to see what is registered.");
+            $this->line("Run 'php tether routes' to see what is registered.");
 
             return self::COMMAND_SUCCESS;
         }

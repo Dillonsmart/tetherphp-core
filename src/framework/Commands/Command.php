@@ -109,7 +109,7 @@ class Command
      */
     public function usage(): string
     {
-        $usage = "tether {$this->command}";
+        $usage = "php tether {$this->command}";
 
         foreach (array_keys($this->arguments) as $argument) {
             $usage .= " <{$argument}>";

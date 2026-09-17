@@ -79,7 +79,7 @@ class CommandTest extends TestCase
 
     public function testUsageIsBuiltFromWhatTheCommandDeclares(): void
     {
-        $this->assertSame('tether fixture:two <name> <kind> [--force]', $this->command()->usage());
+        $this->assertSame('php tether fixture:two <name> <kind> [--force]', $this->command()->usage());
     }
 
     public function testACommandWithNoInputStillWorks(): void

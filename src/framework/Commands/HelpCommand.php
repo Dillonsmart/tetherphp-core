@@ -37,7 +37,7 @@ class HelpCommand extends Command
         }
 
         $this->line();
-        $this->line("Run 'tether help <command>' for what a single command takes.");
+        $this->line("Run 'php tether help <command>' for what a single command takes.");
 
         if ($console->skipped() !== []) {
             $this->error("\nSome commands could not be registered:");

@@ -196,7 +196,7 @@ class IntrospectionTest extends TestCase
 
         $this->assertSame('app/Actions', $context['conventions']['directories']['actions']);
         $this->assertSame('Domains\\<Feature>\\Results', $context['conventions']['namespaces']['results']);
-        $this->assertSame('tether make:action <feature> <operation>', $context['conventions']['generate']['action']);
+        $this->assertSame('php tether make:action <feature> <operation>', $context['conventions']['generate']['action']);
         $this->assertArrayHasKey('resource', $context['conventions']['generate']);
         $this->assertContains('Responder', $context['pipeline']);
 
