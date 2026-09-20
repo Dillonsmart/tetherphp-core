@@ -610,6 +610,39 @@ Compose it above `VerifyCsrfToken`. Both orders are safe — the request is a
 write before and after the override — but the CSRF middleware logs the verb it
 rejected, and the verb the application asked for is the more useful one to read.
 
+`Middleware\SecurityHeaders` is the third, and the only one that works on the
+way *out*. It adds `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`
+and `Referrer-Policy: strict-origin-when-cross-origin` to every response —
+error pages included, because the Kernel turns an `HttpException` into a
+Response inside the middleware. It takes the list to send, so an application
+that wants a different frame policy or a Content-Security-Policy passes its own
+(`[...SecurityHeaders::DEFAULTS, 'Content-Security-Policy' => ...]`). No CSP
+is shipped by default on purpose: there is no policy that is both useful and
+safe for an application the framework has not seen, and the skeleton's own
+views use inline styles a strict one blocks. The skeleton composes it first in
+the list, so it is outermost and wraps everything.
+
+### Sessions: what is hardened and what the application must do
+
+`Session::start()` sets the cookie `HttpOnly` and `SameSite=Lax`, starts PHP's
+session in **strict mode** (`use_strict_mode`, off by PHP's default) so an ID
+the client invented is refused rather than initialised, and sets `Secure` when
+the request arrived over TLS.
+
+**Behind a proxy that terminates TLS** — Caddy, nginx, a load balancer — PHP
+sees plain HTTP and `$_SERVER['HTTPS']` is empty, so `Secure` would be dropped
+on exactly the deployments that have TLS. `new Session(trustForwardedProto:
+true)` makes it believe `X-Forwarded-Proto: https` too. It is off by default
+and must stay off without a proxy, because any client can send that header.
+The skeleton reads it from `TRUST_FORWARDED_PROTO` in `.env`.
+
+**Call `regenerateId()` when a user's privilege changes** — on login, above
+all. The framework has no login and so never calls it; an application that
+adds one must, or a session ID that existed before the login carries the
+privilege afterwards. Regenerating also drops the CSRF token, so a token issued
+to the anonymous session does not authorise writes for the signed-in one; the
+next request gets a fresh one.
+
 ### Where the list is declared, and why it moved
 
 `routes/middleware.php`, next to `routes/web.php`. Everything in `routes/`

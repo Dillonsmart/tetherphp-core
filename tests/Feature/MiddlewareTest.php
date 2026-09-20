@@ -7,6 +7,7 @@ namespace TetherPHP\Tests\Feature;
 use PHPUnit\Framework\TestCase;
 use TetherPHP\framework\Http\Response;
 use TetherPHP\framework\Interfaces\MiddlewareInterface;
+use TetherPHP\framework\Middleware\SecurityHeaders;
 use TetherPHP\framework\Modules\Env;
 use TetherPHP\framework\Modules\Log;
 use TetherPHP\Kernel;
@@ -92,6 +93,30 @@ class MiddlewareTest extends TestCase
 
         $this->assertSame('hello world', $response->body());
         $this->assertSame('DENY', $response->headers()['X-Frame-Options']);
+    }
+
+    /**
+     * The three defaults land on every response, including a 404 — headers
+     * are added on the way out, and the Kernel turns the miss into a Response
+     * inside the middleware.
+     */
+    public function testSecurityHeadersLandOnEveryResponseIncludingErrors(): void
+    {
+        foreach (['/greet', '/no-such-route'] as $uri) {
+            $headers = $this->get($uri, [new SecurityHeaders()])->headers();
+
+            $this->assertSame('nosniff', $headers['X-Content-Type-Options'], $uri);
+            $this->assertSame('DENY', $headers['X-Frame-Options'], $uri);
+            $this->assertSame('strict-origin-when-cross-origin', $headers['Referrer-Policy'], $uri);
+        }
+    }
+
+    public function testSecurityHeadersSendExactlyTheListGiven(): void
+    {
+        $headers = $this->get('/greet', [new SecurityHeaders(['X-Frame-Options' => 'SAMEORIGIN'])])->headers();
+
+        $this->assertSame('SAMEORIGIN', $headers['X-Frame-Options']);
+        $this->assertArrayNotHasKey('X-Content-Type-Options', $headers);
     }
 
     public function testMiddlewareCanAnswerTheRequestItself(): void

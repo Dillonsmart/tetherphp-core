@@ -39,7 +39,7 @@ src/
     ├── Helpers/        # Global functions and the Route view helper
     ├── Http/           # Response
     ├── Interfaces/     # ActionInterface, DomainResult, MiddlewareInterface, RequestInterface, ResponderInterface, ServicesInterface
-    ├── Middleware/     # VerifyCsrfToken, OverridesMethod
+    ├── Middleware/     # VerifyCsrfToken, OverridesMethod, SecurityHeaders
     ├── Modules/        # Console, Input, Env, Log
     ├── Requests/       # Request
     ├── Routing/        # Route (the result of matching)

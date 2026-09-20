@@ -11,6 +11,22 @@ class Session
     private bool $started = false;
 
     /**
+     * Whether to believe `X-Forwarded-Proto: https` when deciding the cookie's
+     * Secure flag.
+     *
+     * Behind Caddy, nginx or a load balancer that terminates TLS, PHP sees a
+     * plain HTTP request and `$_SERVER['HTTPS']` is empty, so the session
+     * cookie went out without Secure on exactly the deployments that had TLS.
+     * The header is the proxy's word for it — and any client can send the
+     * header too, so it is only believed when the application says there is a
+     * proxy in front of it. Off by default: trusting it blindly would let a
+     * plain-HTTP client claim HTTPS.
+     */
+    public function __construct(private readonly bool $trustForwardedProto = false)
+    {
+    }
+
+    /**
      * Constructing a Session does nothing. Using one starts it.
      *
      * The constructor used to call session_start(), which meant merely naming
@@ -77,11 +93,34 @@ class Session
                 'samesite' => 'Lax',
                 // only promise Secure when the request actually arrived over TLS,
                 // or the cookie is dropped in local development
-                'secure' => ($_SERVER['HTTPS'] ?? '') !== '' && ($_SERVER['HTTPS'] ?? '') !== 'off',
+                'secure' => $this->arrivedOverTls(),
             ]);
         }
 
-        session_start();
+        // strict mode refuses a session ID the client made up rather than
+        // initialising a session under it, which is the precondition for
+        // fixation. PHP's default is off.
+        session_start(['use_strict_mode' => true]);
+    }
+
+    /**
+     * TLS as PHP saw it, or as a trusted proxy reported it.
+     */
+    private function arrivedOverTls(): bool
+    {
+        $https = $_SERVER['HTTPS'] ?? '';
+
+        if (is_string($https) && $https !== '' && $https !== 'off') {
+            return true;
+        }
+
+        if (!$this->trustForwardedProto) {
+            return false;
+        }
+
+        $forwarded = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
+
+        return is_string($forwarded) && strtolower(trim($forwarded)) === 'https';
     }
 
     /**
@@ -91,6 +130,13 @@ class Session
      * Without it an attacker who can plant a session id keeps access after the
      * victim authenticates.
      */
+    /**
+     * Call this when a user's privilege changes — on login, above all — so a
+     * session ID that existed before the change is not the one that carries
+     * the privilege. The CSRF token goes with it, so a token issued to the
+     * anonymous session does not authorise writes for the signed-in one; the
+     * next request is issued a fresh one.
+     */
     public function regenerateId(bool $deleteOldSession = true): void
     {
         $this->ensureStarted();
@@ -98,6 +144,7 @@ class Session
         if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
             session_regenerate_id($deleteOldSession);
             $_SESSION['SESSION_ID'] = session_id();
+            unset($_SESSION['csrf_token']);
         }
     }
 
