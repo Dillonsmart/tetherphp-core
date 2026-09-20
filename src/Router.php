@@ -147,12 +147,20 @@ class Router
      * segment into a real one and change how many segments there are; decoding
      * each segment on its own means `/posts/caf%C3%A9` reaches the Domain as
      * `café`, `/gre%65t` matches `/greet`, and a parameter may carry a literal
-     * slash if it was sent encoded. Nothing decodes twice.
+     * slash if it was sent encoded. Nothing decodes twice. A segment that
+     * decodes to a NUL byte matches nothing: no route wants one, and it would
+     * otherwise reach a Responder or a file path as a bare `\0`.
      */
     public function match(string $method, string $uri): Route
     {
         $routes = $this->routesFor($method);
         $requestParts = array_map(rawurldecode(...), explode('/', $uri));
+
+        foreach ($requestParts as $part) {
+            if (str_contains($part, "\0")) {
+                return Route::none();
+            }
+        }
 
         foreach ($routes as $pattern => $route) {
             if ($route['type'] !== Route::TYPE_DYNAMIC && $this->sameSegments(explode('/', $pattern), $requestParts)) {
@@ -213,6 +221,12 @@ class Router
 
         foreach ($parts as $index => $part) {
             if (str_starts_with($part, '{') && str_ends_with($part, '}')) {
+                // an empty segment is a trailing slash, not a value: `/notes/`
+                // used to reach Show with an id of ''
+                if ($requestParts[$index] === '') {
+                    return null;
+                }
+
                 // captured verbatim: the segment is the application's data, not
                 // something for the router to normalise
                 $params[trim($part, '{}')] = $requestParts[$index];

@@ -1,17 +1,21 @@
 # TetherPHP Core
 
+*Built with the help of [Claude Code](https://claude.com/claude-code), in public.*
+
 The core framework package behind [TetherPHP](https://github.com/Dillonsmart/tetherphp) — routing, request handling,
 sessions, CSRF protection as composable middleware, the console kernel and the code-generation stubs.
 
 This repository is the **source of truth** for the framework. The `dillonsmart/tetherphp` skeleton application consumes
 it as a Composer dependency; framework changes are made here, not there.
 
-It is built in public. The [dev log](https://tetherphp.com/devlog) records what broke and why, and development is
+It is built in public, with Claude Code. An AI agent writes much of the code; the reasoning behind each change is
+in the commit messages, and the [dev log](https://tetherphp.com/devlog) records what broke and why. Development is
 posted on X at [@DillonDevStuff](https://x.com/DillonDevStuff).
 
 ## Requirements
 
-- PHP 8.5 or higher (property hooks and `new` without parentheses are used throughout)
+- PHP 8.5 or higher — property hooks and `new` without parentheses are used throughout, so 8.4 fatals rather than
+  degrades
 - Composer 2
 
 ## Installation

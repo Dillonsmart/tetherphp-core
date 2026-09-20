@@ -354,9 +354,14 @@ class Kernel
             return '/';
         }
 
-        $path = parse_url($uri, PHP_URL_PATH);
+        // Not parse_url(): it is for URLs, and REQUEST_URI is a path. It
+        // returned false for `/notes:80` and read `//host/x` as a host, and
+        // the fallback served the home page for both. The path is whatever
+        // comes before the `?`.
+        $path = strstr($uri, '?', true);
+        $path = $path === false ? $uri : $path;
 
-        return is_string($path) && $path !== '' ? $path : '/';
+        return $path !== '' ? $path : '/';
     }
 
     /**
@@ -381,13 +386,13 @@ class Kernel
             return [];
         }
 
-        $queryString = parse_url($uri, PHP_URL_QUERY);
+        $queryString = strstr($uri, '?');
 
-        if (!is_string($queryString) || $queryString === '') {
+        if ($queryString === false || $queryString === '?') {
             return [];
         }
 
-        parse_str($queryString, $query);
+        parse_str(substr($queryString, 1), $query);
 
         return $this->withStringKeys($query);
     }

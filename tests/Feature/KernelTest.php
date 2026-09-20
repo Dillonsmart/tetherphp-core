@@ -154,6 +154,31 @@ class KernelTest extends TestCase
     }
 
     /**
+     * The path used to come out of parse_url(), which returns false for
+     * `/notes:80` and reads `//host/x` as a host — and the fallback for both
+     * was `/`, so the home page answered them with a 200.
+     */
+    public function testAPathParseUrlCannotReadIsA404NotTheHomePage(): void
+    {
+        $this->router->get('/', \TetherPHP\Tests\Fixtures\app\Actions\Greet::class);
+
+        $this->assertSame(404, $this->get('/notes:80')->status());
+        $this->assertSame(404, $this->get('/x:1/y')->status());
+        $this->assertSame(404, $this->get('//evil.com/')->status());
+    }
+
+    public function testTheQueryStringIsStillParsedOffTheUri(): void
+    {
+        $this->router->get('/posts', \TetherPHP\Tests\Fixtures\app\Actions\Echoes::class);
+
+        $echoed = json_decode($this->get('/posts?page=2&sort=title')->body(), true);
+
+        $this->assertSame('/posts', $echoed['uri']);
+        $this->assertSame(['page' => '2', 'sort' => 'title'], $echoed['query']);
+        $this->assertSame([], json_decode($this->get('/posts?')->body(), true)['query']);
+    }
+
+    /**
      * An Action ends a request early by throwing — the Kernel turns the
      * exception into the error Response rather than the Action building one.
      */

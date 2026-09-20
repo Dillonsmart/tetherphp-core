@@ -23,13 +23,14 @@ final class Response
         private readonly int $status = 200,
         private readonly array $headers = [],
     ) {
-        // header() refuses a value with a newline in it, but by warning and
-        // dropping the header — so a redirect built from a target carrying
-        // %0d%0a went out as a 303 with no Location, and the only trace was a
-        // line in the log. Refusing here makes it an exception with a reason.
+        // header() refuses a value with a newline or a NUL byte in it, but by
+        // warning and dropping the header — so a redirect built from a target
+        // carrying %0d%0a or %00 went out as a 303 with no Location, and the
+        // only trace was a line in the log. Refusing here makes it an
+        // exception with a reason.
         foreach ($headers as $name => $value) {
-            if (preg_match('/[\r\n]/', $name . $value) === 1) {
-                throw new \InvalidArgumentException("Header '{$name}' must not contain a newline.");
+            if (preg_match('/[\r\n\0]/', $name . $value) === 1) {
+                throw new \InvalidArgumentException("Header '{$name}' must not contain a newline or a NUL byte.");
             }
         }
     }

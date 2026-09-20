@@ -713,9 +713,11 @@ contract; the skeleton demonstrates it.
 
 ## Request handling invariants
 
-- **Route on the path, not `REQUEST_URI`.** The Kernel splits the query string off with `parse_url`; routing on the
+- **Route on the path, not `REQUEST_URI`.** The Kernel splits the query string off at the first `?`; routing on the
   raw value meant any URL carrying parameters 404'd. The query string is not discarded — it reaches the Action as
-  `$request->query`, which is what lets an index page paginate, filter or search.
+  `$request->query`, which is what lets an index page paginate, filter or search. The split is not `parse_url()`:
+  that is for URLs, returns `false` for a path like `/notes:80` and reads `//host/x` as a host, and the fallback for
+  both was `/` — so the home page answered them with a 200.
 - **Matching ignores case; the URI is not rewritten to achieve it.** `Request` used to lowercase the URI through a
   property hook, which lowercased every parameter captured out of it — so `/posts/{slug}` could not carry a slug
   with a capital and `/users/{uuid}` was broken for half the UUIDs there are. `Router::match()` compares
@@ -723,14 +725,16 @@ contract; the skeleton demonstrates it.
 - **Segments are percent-decoded one at a time, in the Router, once.** `/posts/caf%C3%A9` reaches the Domain as
   `café` and `/gre%65t` matches `/greet`. The path is split on `/` *before* decoding, so an encoded slash inside a
   segment stays inside it — a parameter can carry a literal `/` — and cannot change how many segments there are.
-  Nothing else decodes: an Action that calls `rawurldecode()` on a parameter decodes twice.
+  Nothing else decodes: an Action that calls `rawurldecode()` on a parameter decodes twice. A segment that decodes
+  to a NUL byte matches no route, and an empty segment satisfies no parameter: `/notes/` is a trailing slash on the
+  collection, not a Show with an id of `''`, and 404s.
 - **The body has no limit of its own.** JSON and form-encoded bodies are read from `php://input` in full; JSON is
   decoded to PHP's default depth of 512, and `parse_str()` is not bounded by `max_input_vars` the way `$_POST` is.
   The only caps are PHP's `post_max_size` and `memory_limit`. Set them for the deployment; do not assume the
   framework did.
-- **A header may not carry a newline.** `Response` refuses one with an `InvalidArgumentException`. PHP's `header()`
-  already refused it, by warning and dropping the header, so a redirect built from a target carrying `%0d%0a` went
-  out as a 303 with no `Location` and one line in the log. The generated Responders only ever redirect to a URI
+- **A header may not carry a newline or a NUL byte.** `Response` refuses one with an `InvalidArgumentException`.
+  PHP's `header()` already refused both, by warning and dropping the header, so a redirect built from a target
+  carrying `%0d%0a` or `%00` went out as a 303 with no `Location` and one line in the log. The generated Responders only ever redirect to a URI
   they built; a Responder that redirects to a value off the request is an open redirect, and `Response::redirect()`'s
   docblock says what to check.
 - **The body is parsed for every verb.** `Kernel::payload()` decodes JSON, prefers `$_POST` where PHP has filled it

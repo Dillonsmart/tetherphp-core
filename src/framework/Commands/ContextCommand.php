@@ -122,7 +122,7 @@ class ContextCommand extends Command
                 . 'and hands its Domain the pieces the Domain asks for by constructor.',
                 'A Domain returns a DomainResult and knows nothing about HTTP.',
                 'A Responder names the view variables; a Result is named for its shape, not its operation.',
-                'Routes match case-insensitively; a captured parameter arrives exactly as it was sent.',
+                'Routes match case-insensitively; a captured parameter is percent-decoded once, keeps its case, and is never empty.',
                 'A static route wins over a dynamic route of the same shape.',
                 'A dynamic route only matches a URI with the same number of segments.',
                 'End a request early by throwing an HttpException.',

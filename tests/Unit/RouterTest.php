@@ -220,6 +220,32 @@ class RouterTest extends TestCase
         $this->assertFalse($router->match('GET', '/posts/a%2Fb/c')->matched);
     }
 
+    /**
+     * `/notes/` is a trailing slash on the collection, not a Show with an
+     * empty id — it used to dispatch to the dynamic route with `id => ''`.
+     */
+    public function testATrailingSlashDoesNotSatisfyAParameter(): void
+    {
+        $router = new Router();
+        $router->get('/notes', 'Actions\Index');
+        $router->get('/notes/{id}', 'Actions\Show');
+
+        $this->assertFalse($router->match('GET', '/notes/')->matched);
+        $this->assertSame('Actions\Index', $router->match('GET', '/notes')->action);
+        $this->assertSame(['id' => '42'], $router->match('GET', '/notes/42')->params);
+    }
+
+    public function testASegmentThatDecodesToANulByteMatchesNothing(): void
+    {
+        $router = new Router();
+        $router->get('/posts/{slug}', 'Actions\Show');
+        $router->get('/greet', 'Actions\Greet');
+
+        $this->assertFalse($router->match('GET', '/posts/%00')->matched);
+        $this->assertFalse($router->match('GET', '/posts/a%00b')->matched);
+        $this->assertFalse($router->match('GET', '/gre%00et')->matched);
+    }
+
     public function testACapturedUuidIsNotLowercased(): void
     {
         $router = new Router();

@@ -38,4 +38,30 @@ class LogTest extends TestCase
         $this->assertCount(1, $lines);
         $this->assertStringEndsWith('[error] first line [2020-01-01 00:00:00] [info] forged entry third', $lines[0]);
     }
+
+    /**
+     * The fallback for an unwritable directory is PHP's own error log, and
+     * the message reaches it flattened too — it used to go there raw, before
+     * the newlines were stripped.
+     */
+    public function testTheFallbackLogGetsOneLineToo(): void
+    {
+        touch($this->directory);
+        $errorLog = $this->directory . '.error_log';
+        $previous = ini_set('error_log', $errorLog);
+
+        try {
+            new Log($this->directory . '/logs')->error("first\n[forged] second");
+        } finally {
+            ini_set('error_log', $previous === false ? '' : $previous);
+        }
+
+        $lines = file($errorLog, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        unlink($errorLog);
+        unlink($this->directory);
+
+        $this->assertCount(2, $lines);
+        $this->assertStringContainsString('cannot create log directory', $lines[0]);
+        $this->assertStringEndsWith('[error] first [forged] second', $lines[1]);
+    }
 }

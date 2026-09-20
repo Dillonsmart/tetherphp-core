@@ -29,6 +29,17 @@ class ResponseTest extends TestCase
         Response::html('')->withHeader("X-Thing\n", 'value');
     }
 
+    /**
+     * header() drops a value carrying a NUL byte the same way it drops one
+     * carrying a newline: a warning, and no header.
+     */
+    public function testAHeaderCarryingANulByteIsRefused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        Response::redirect("/posts/\0");
+    }
+
     public function testAnOrdinaryRedirectIsUnaffected(): void
     {
         $response = Response::redirect('/posts/12', 303);
