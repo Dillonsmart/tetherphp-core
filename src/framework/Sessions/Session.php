@@ -6,7 +6,11 @@ namespace TetherPHP\framework\Sessions;
 
 class Session
 {
-    const int TIMEOUT = 1800; // 30 mins default - TODO make this configurable
+    /** Seconds of inactivity after which the session is dropped. */
+    public const int IDLE_TIMEOUT = 1800;
+
+    /** Seconds after which the session is dropped however active it has been. */
+    public const int LIFETIME = 43200;
 
     private bool $started = false;
 
@@ -22,8 +26,20 @@ class Session
      * proxy in front of it. Off by default: trusting it blindly would let a
      * plain-HTTP client claim HTTPS.
      */
-    public function __construct(private readonly bool $trustForwardedProto = false)
-    {
+    /**
+     * Both timeouts used to be one constant of thirty minutes, applied to the
+     * session's age as well as to its idleness — so a visitor half-way through
+     * a long form at minute thirty-one was signed out mid-sentence. Idle is
+     * what a timeout is for; the absolute lifetime is a much longer backstop.
+     *
+     * @param int $idleTimeout seconds without a request before the session is dropped
+     * @param int $lifetime    seconds after the session began before it is dropped regardless
+     */
+    public function __construct(
+        private readonly bool $trustForwardedProto = false,
+        private readonly int $idleTimeout = self::IDLE_TIMEOUT,
+        private readonly int $lifetime = self::LIFETIME,
+    ) {
     }
 
     /**
@@ -213,9 +229,8 @@ class Session
         // tampered value must not reach arithmetic
         $startTime = is_int($_SESSION['start_time'] ?? null) ? $_SESSION['start_time'] : $now;
         $lastActivity = is_int($_SESSION['last_activity'] ?? null) ? $_SESSION['last_activity'] : $now;
-        $timeout = self::TIMEOUT;
 
-        if (($now - $startTime > $timeout) || ($now - $lastActivity > $timeout)) {
+        if (($now - $startTime > $this->lifetime) || ($now - $lastActivity > $this->idleTimeout)) {
             $this->destroy();
             return true;
         }

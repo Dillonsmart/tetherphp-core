@@ -636,6 +636,10 @@ true)` makes it believe `X-Forwarded-Proto: https` too. It is off by default
 and must stay off without a proxy, because any client can send that header.
 The skeleton reads it from `TRUST_FORWARDED_PROTO` in `.env`.
 
+**Two timeouts, both the application's to set.** `new Session(idleTimeout: 1800, lifetime: 43200)` are the
+defaults: dropped after thirty idle minutes, or twelve hours however active. They used to be one constant of thirty
+minutes applied to both, so a visitor half-way through a long form at minute thirty-one was signed out.
+
 **Call `regenerateId()` when a user's privilege changes** — on login, above
 all. The framework has no login and so never calls it; an application that
 adds one must, or a session ID that existed before the login carries the
@@ -716,6 +720,19 @@ contract; the skeleton demonstrates it.
   property hook, which lowercased every parameter captured out of it — so `/posts/{slug}` could not carry a slug
   with a capital and `/users/{uuid}` was broken for half the UUIDs there are. `Router::match()` compares
   case-insensitively and captures segments verbatim. Do not put normalisation back on `Request`.
+- **Segments are percent-decoded one at a time, in the Router, once.** `/posts/caf%C3%A9` reaches the Domain as
+  `café` and `/gre%65t` matches `/greet`. The path is split on `/` *before* decoding, so an encoded slash inside a
+  segment stays inside it — a parameter can carry a literal `/` — and cannot change how many segments there are.
+  Nothing else decodes: an Action that calls `rawurldecode()` on a parameter decodes twice.
+- **The body has no limit of its own.** JSON and form-encoded bodies are read from `php://input` in full; JSON is
+  decoded to PHP's default depth of 512, and `parse_str()` is not bounded by `max_input_vars` the way `$_POST` is.
+  The only caps are PHP's `post_max_size` and `memory_limit`. Set them for the deployment; do not assume the
+  framework did.
+- **A header may not carry a newline.** `Response` refuses one with an `InvalidArgumentException`. PHP's `header()`
+  already refused it, by warning and dropping the header, so a redirect built from a target carrying `%0d%0a` went
+  out as a 303 with no `Location` and one line in the log. The generated Responders only ever redirect to a URI
+  they built; a Responder that redirects to a value off the request is an open redirect, and `Response::redirect()`'s
+  docblock says what to check.
 - **The body is parsed for every verb.** `Kernel::payload()` decodes JSON, prefers `$_POST` where PHP has filled it
   (the only thing that can read a multipart body — `php://input` is empty for those, so file uploads would be lost),
   and otherwise parses a form-encoded body itself. Before this, an update sent as a form-encoded PUT arrived empty:

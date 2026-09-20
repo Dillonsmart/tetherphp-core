@@ -202,6 +202,24 @@ class RouterTest extends TestCase
         $this->assertSame(['slug' => 'My-First-Post'], $router->match('GET', '/posts/My-First-Post')->params);
     }
 
+    /**
+     * The path is percent-decoded a segment at a time. A slug with a non-ASCII
+     * character arrives as the character, an encoded letter in a static
+     * segment still matches, and an encoded slash inside a parameter is a
+     * slash in the value rather than a segment boundary.
+     */
+    public function testSegmentsArePercentDecodedOneAtATime(): void
+    {
+        $router = new Router();
+        $router->get('/posts/{slug}', 'Actions\Show');
+        $router->get('/greet', 'Actions\Greet');
+
+        $this->assertSame(['slug' => 'café'], $router->match('GET', '/posts/caf%C3%A9')->params);
+        $this->assertTrue($router->match('GET', '/gre%65t')->matched);
+        $this->assertSame(['slug' => 'a/b'], $router->match('GET', '/posts/a%2Fb')->params);
+        $this->assertFalse($router->match('GET', '/posts/a%2Fb/c')->matched);
+    }
+
     public function testACapturedUuidIsNotLowercased(): void
     {
         $router = new Router();

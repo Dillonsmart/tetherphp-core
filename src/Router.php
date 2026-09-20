@@ -141,13 +141,21 @@ class Router
      *
      * A static route still wins over a dynamic route of the same shape, which
      * is why they are looked at in two passes rather than one.
+     *
+     * The URI is percent-decoded one segment at a time, after splitting on
+     * `/`. Decoding the whole path first would turn an encoded slash inside a
+     * segment into a real one and change how many segments there are; decoding
+     * each segment on its own means `/posts/caf%C3%A9` reaches the Domain as
+     * `café`, `/gre%65t` matches `/greet`, and a parameter may carry a literal
+     * slash if it was sent encoded. Nothing decodes twice.
      */
     public function match(string $method, string $uri): Route
     {
         $routes = $this->routesFor($method);
+        $requestParts = array_map(rawurldecode(...), explode('/', $uri));
 
         foreach ($routes as $pattern => $route) {
-            if ($route['type'] !== Route::TYPE_DYNAMIC && strcasecmp($pattern, $uri) === 0) {
+            if ($route['type'] !== Route::TYPE_DYNAMIC && $this->sameSegments(explode('/', $pattern), $requestParts)) {
                 return Route::to($route['action'], $route['type']);
             }
         }
@@ -157,7 +165,7 @@ class Router
                 continue;
             }
 
-            $params = $this->matchDynamic($pattern, $uri);
+            $params = $this->matchDynamic($pattern, $requestParts);
 
             if ($params !== null) {
                 // first match wins; without returning here the last registered
@@ -170,12 +178,32 @@ class Router
     }
 
     /**
+     * @param list<string> $patternParts
+     * @param list<string> $requestParts already decoded
+     */
+    private function sameSegments(array $patternParts, array $requestParts): bool
+    {
+        if (count($patternParts) !== count($requestParts)) {
+            return false;
+        }
+
+        foreach ($patternParts as $index => $part) {
+            if (strcasecmp($part, $requestParts[$index]) !== 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param list<string> $requestParts already decoded
+     *
      * @return array<string, string>|null the captured parameters, or null if the pattern does not match
      */
-    private function matchDynamic(string $pattern, string $uri): ?array
+    private function matchDynamic(string $pattern, array $requestParts): ?array
     {
         $parts = explode('/', $pattern);
-        $requestParts = explode('/', $uri);
 
         if (count($parts) !== count($requestParts)) {
             return null;

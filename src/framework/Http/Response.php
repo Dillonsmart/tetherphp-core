@@ -23,6 +23,15 @@ final class Response
         private readonly int $status = 200,
         private readonly array $headers = [],
     ) {
+        // header() refuses a value with a newline in it, but by warning and
+        // dropping the header — so a redirect built from a target carrying
+        // %0d%0a went out as a 303 with no Location, and the only trace was a
+        // line in the log. Refusing here makes it an exception with a reason.
+        foreach ($headers as $name => $value) {
+            if (preg_match('/[\r\n]/', $name . $value) === 1) {
+                throw new \InvalidArgumentException("Header '{$name}' must not contain a newline.");
+            }
+        }
     }
 
     public static function html(string $body, int $status = 200): self
@@ -46,6 +55,15 @@ final class Response
         return new self($encoded, $status, ['Content-Type' => 'application/json']);
     }
 
+    /**
+     * A redirect to a location the application chose.
+     *
+     * Never pass a value that came off the request without checking it. A
+     * Responder that redirects to `$request->query['next']` is an open
+     * redirect: a link to your site that lands on someone else's. If a target
+     * has to come from the request, accept it only when it starts with a
+     * single `/` — `//evil.example` is a scheme-relative URL and leaves too.
+     */
     public static function redirect(string $location, int $status = 302): self
     {
         return new self('', $status, ['Location' => $location]);

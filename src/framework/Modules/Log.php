@@ -77,6 +77,11 @@ final class Log
         }
 
         $file = $directory . date('Y-m-d') . '.log';
+
+        // one entry is one line. A message carrying a newline — an exception
+        // that echoes what a visitor sent — would otherwise write a line that
+        // looks like an entry of its own
+        $message = str_replace(["\r\n", "\r", "\n"], ' ', $message);
         $line = '[' . date('Y-m-d H:i:s') . "] [{$level}] {$message}" . PHP_EOL;
 
         // LOCK_EX: concurrent requests append to the same file and would

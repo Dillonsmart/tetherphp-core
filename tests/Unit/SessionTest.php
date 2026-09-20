@@ -58,6 +58,30 @@ class SessionTest extends TestCase
         $this->assertSame('1', ini_get('session.use_strict_mode'));
     }
 
+    /**
+     * Idle and absolute lifetime are separate, and both are the application's
+     * to set. A session used a minute ago is alive however old it is, up to
+     * the lifetime; a session untouched past the idle timeout is not.
+     */
+    public function testIdleTimeoutAndLifetimeAreSeparate(): void
+    {
+        $session = new Session(idleTimeout: 60, lifetime: 3600);
+        $session->set('probe', 'value');
+
+        $_SESSION['start_time'] = time() - 1800;
+        $_SESSION['last_activity'] = time() - 10;
+        $this->assertFalse($session->isExpired(), 'active and within lifetime');
+
+        $_SESSION['last_activity'] = time() - 120;
+        $this->assertTrue($session->isExpired(), 'idle past the idle timeout');
+
+        $session = new Session(idleTimeout: 60, lifetime: 3600);
+        $session->set('probe', 'value');
+        $_SESSION['start_time'] = time() - 7200;
+        $_SESSION['last_activity'] = time() - 10;
+        $this->assertTrue($session->isExpired(), 'active but past the lifetime');
+    }
+
     public function testRegeneratingTheIdDropsTheCsrfToken(): void
     {
         $session = new Session();
